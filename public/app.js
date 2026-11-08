@@ -158,44 +158,33 @@
     renderList('pastwork', 'pastwork-grid', 'pastwork-pager', 'Past work is coming soon.');
     renderList('projects', 'projects-grid', 'projects-pager', 'Projects are coming soon.');
 
-    // Client logo marquee: two rows move in opposite directions.
+    // Static client logo strip.
     const showcase = $('clients-showcase');
+    const clientsStrip = $('clients-strip');
     const clients = db.clients || [];
     showcase.classList.toggle('hidden', !clients.length);
-    const makeLogo = (client) => {
-      const link = h(client.invite ? 'a' : 'div', 'client-logo');
-      if (client.invite) {
-        link.href = safeUrl(client.invite);
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.setAttribute('aria-label', client.name);
-      }
-      if (client.icon) {
-        const img = h('img');
-        img.src = client.icon;
-        img.alt = client.name || 'Client community';
-        img.loading = 'lazy';
-        link.append(img);
-      } else {
-        link.append(h('span', 'text-center text-xs font-semibold text-white/70', client.name || 'Community'));
-      }
-      return link;
-    };
-    const fillMarqueeRow = (id, items, reverse) => {
-      const host = $(id);
-      host.replaceChildren();
-      if (!items.length) return;
-      const track = h('div', 'client-track' + (reverse ? ' reverse' : ''));
-      const group = h('div', 'flex shrink-0 items-center gap-[4.5rem]');
-      items.forEach((client) => group.append(makeLogo(client)));
-      const duplicate = group.cloneNode(true);
-      track.append(group, duplicate);
-      host.append(track);
-    };
-    const rowOne = clients.filter((_, i) => i % 2 === 0);
-    const rowTwo = clients.filter((_, i) => i % 2 === 1);
-    fillMarqueeRow('clients-row-one', rowOne.length ? rowOne : clients, false);
-    fillMarqueeRow('clients-row-two', rowTwo.length ? rowTwo : clients, true);
+    clientsStrip.replaceChildren(
+      ...clients.map((client) => {
+        const link = h(client.invite ? 'a' : 'div', 'client-logo');
+        if (client.invite) {
+          link.href = safeUrl(client.invite);
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.setAttribute('aria-label', client.name);
+        }
+        if (client.icon) {
+          const img = h('img');
+          img.src = client.icon;
+          img.alt = client.name || 'Client community';
+          img.loading = 'lazy';
+          link.append(img);
+        } else {
+          link.append(h('span', 'text-center text-xs font-semibold text-white/70', client.name || 'Community'));
+        }
+        clientsStrip.append(link);
+        return link;
+      })
+    );
 
     // Reviews are managed through the admin panel.
     const reviewsGrid = $('reviews-grid');

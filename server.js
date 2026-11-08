@@ -153,7 +153,7 @@ function setCookie(req, res, name, value, maxAgeSec) {
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', true);
-app.use(express.json({ limit: '200kb' }));
+app.use(express.json({ limit: '200kb', inflate: false }));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -312,7 +312,7 @@ async function handleCallback(req, res) {
         client_secret: CLIENT_SECRET,
         grant_type: 'authorization_code',
         code: String(req.query.code),
-        redirect_uri: redirectUri(req),
+        redirect_uri: redirectUri(),
       }),
     });
     if (!tokenRes.ok) return res.redirect('/?login=failed');

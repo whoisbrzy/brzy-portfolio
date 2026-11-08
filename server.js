@@ -17,13 +17,12 @@ if (fs.existsSync(envFile)) {
 
 const ON_VERCEL = !!process.env.VERCEL;
 const PORT = Number(process.env.PORT || 3000);
-const BASE_URL = (process.env.BASE_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : `http://localhost:${PORT}`)).replace(/\/$/, '');
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
-const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${BASE_URL}/auth/discord`;
+// Optional override. Normally the redirect address is built from the site being visited.
+const REDIRECT_OVERRIDE = process.env.DISCORD_REDIRECT_URI || '';
 const ADMIN_IDS = (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
 const SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
-const SECURE = BASE_URL.startsWith('https://');
 if (!process.env.SESSION_SECRET) console.warn('SESSION_SECRET not set: logins will not survive restarts or work across serverless instances.');
 
 // --- files read once at startup (literal paths so Vercel bundles them) ---
@@ -63,6 +62,16 @@ async function saveDb(db) {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
 }
 
+// The public address of this site as the visitor sees it (works behind Vercel's proxy).
+function origin(req) {
+  const first = (v) => String(v || '').split(',')[0].trim();
+  const proto = first(req.headers['x-forwarded-proto']) || req.protocol || 'http';
+  const host = first(req.headers['x-forwarded-host']) || req.headers.host || 'localhost';
+  return `${proto}://${host}`;
+}
+const isSecure = (req) => origin(req).startsWith('https://');
+const redirectUri = (req) => REDIRECT_OVERRIDE || `${origin(req)}/auth/discord`;
+
 // --- signed cookies ---
 const sign = (v) => crypto.createHmac('sha256', SECRET).update(v).digest('base64url');
 function makeToken(payload) {
@@ -82,15 +91,16 @@ function readToken(token) {
 }
 const parseCookies = (req) =>
   Object.fromEntries((req.headers.cookie || '').split(';').map((c) => c.trim().split(/=(.*)/s).slice(0, 2)).filter(([k]) => k));
-function setCookie(res, name, value, maxAgeSec) {
+function setCookie(req, res, name, value, maxAgeSec) {
   const parts = [`${name}=${value}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${maxAgeSec}`];
-  if (SECURE) parts.push('Secure');
+  if (isSecure(req)) parts.push('Secure');
   const prev = res.getHeader('Set-Cookie') || [];
   res.setHeader('Set-Cookie', [].concat(prev, parts.join('; ')));
 }
 
 const app = express();
 app.disable('x-powered-by');
+app.set('trust proxy', true);
 app.use(express.json({ limit: '50kb' }));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -116,12 +126,12 @@ function requireAdmin(req, res, next) {
 function startLogin(req, res) {
   if (!CLIENT_ID || !CLIENT_SECRET) return res.status(500).send('Discord login is not configured. Set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.');
   const state = crypto.randomBytes(16).toString('hex');
-  setCookie(res, 'oauth_state', makeToken({ state, exp: Date.now() + 10 * 60 * 1000 }), 600);
+  setCookie(req, res, 'oauth_state', makeToken({ state, exp: Date.now() + 10 * 60 * 1000 }), 600);
   const url = new URL('https://discord.com/oauth2/authorize');
   url.search = new URLSearchParams({
     client_id: CLIENT_ID,
     response_type: 'code',
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirectUri(req),
     scope: 'identify',
     state,
   }).toString();
@@ -140,7 +150,7 @@ async function handleCallback(req, res) {
         client_secret: CLIENT_SECRET,
         grant_type: 'authorization_code',
         code: String(req.query.code),
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: redirectUri(req),
       }),
     });
     if (!tokenRes.ok) return res.redirect('/?login=failed');
@@ -150,7 +160,7 @@ async function handleCallback(req, res) {
     const u = await meRes.json();
     const avatar = u.avatar ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=256` : '';
     const session = { id: u.id, name: u.global_name || u.username, avatar, exp: Date.now() + 7 * 24 * 3600 * 1000 };
-    setCookie(res, 'session', makeToken(session), 7 * 24 * 3600);
+    setCookie(req, res, 'session', makeToken(session), 7 * 24 * 3600);
     if (ADMIN_IDS.includes(u.id) && avatar) {
       // Best effort: a storage problem must not block logging in.
       try {
@@ -174,7 +184,7 @@ async function handleCallback(req, res) {
 app.get('/auth/discord', (req, res) => (req.query.code || req.query.error ? handleCallback(req, res) : startLogin(req, res)));
 
 app.post('/auth/logout', (req, res) => {
-  setCookie(res, 'session', '', 0);
+  setCookie(req, res, 'session', '', 0);
   res.json({ ok: true });
 });
 
@@ -312,6 +322,6 @@ app.use((err, req, res, next) => {
 });
 
 // Vercel imports the app; locally we start a server.
-if (!ON_VERCEL) app.listen(PORT, () => console.log(`brzy-portfolio running at ${BASE_URL}`));
+if (!ON_VERCEL) app.listen(PORT, () => console.log(`brzy-portfolio running at http://localhost:${PORT}`));
 
 export default app;

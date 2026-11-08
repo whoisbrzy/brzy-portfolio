@@ -10,13 +10,12 @@ Portfolio with a notch navbar, a ColorBends WebGL background, separate click-thr
 
    | Name | Value |
    |---|---|
-   | `BASE_URL` | `https://brzyx.vercel.app` (your live URL, no trailing slash) |
    | `DISCORD_CLIENT_ID` | from the Discord developer portal |
    | `DISCORD_CLIENT_SECRET` | from the Discord developer portal |
    | `ADMIN_IDS` | your Discord user ID (comma-separate more than one) |
    | `SESSION_SECRET` | a long random string |
 
-4. Discord developer portal, OAuth2 -> Redirects: add `https://brzyx.vercel.app/auth/discord`. The only scope used is `identify`.
+4. Discord developer portal, OAuth2 -> Redirects: add `https://brzyx.vercel.app/auth/discord`. The only scope used is `identify`. The redirect address is built from the site the visitor is on, so it must be registered for exactly the domain you use (no trailing slash).
 5. Redeploy, then open `https://brzyx.vercel.app/api/content`. You should see JSON. If you see a 404, the server isn't running (check that the project has no custom Output Directory or Framework override that conflicts with `vercel.json`).
 
 ## Run locally

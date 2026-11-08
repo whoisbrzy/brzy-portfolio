@@ -37,6 +37,7 @@
     '/reviews': 'reviews',
     '/privacy': 'privacy',
     '/terms': 'terms',
+    '/admin': 'admin',
   };
   const TITLES = { home: '', 'past-work': 'Past Work', projects: 'Projects', contact: 'Contact', reviews: 'Reviews', privacy: 'Privacy Policy', terms: 'Terms of Service' };
   let db = { profile: { name: 'brzy', tagline: '', avatar: '' }, pastwork: [], projects: [], contacts: [], clients: [], reviews: [] };
@@ -60,9 +61,12 @@
       if (on) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     });
+    const adminPage = name === 'admin';
+    document.querySelector('header').classList.toggle('hidden', adminPage);
     $('veil-home').style.opacity = name === 'home' ? '1' : '0';
-    $('veil-page').style.opacity = name === 'home' ? '0' : '1';
-    document.title = (TITLES[name] ? TITLES[name] + ' · ' : '') + db.profile.name + "'s Portfolio";
+    $('veil-page').style.opacity = name === 'home' || adminPage ? '0' : '1';
+    $('admin-mount').classList.toggle('hidden', !adminPage);
+    document.title = (adminPage ? 'Admin · ' : TITLES[name] ? TITLES[name] + ' · ' : '') + db.profile.name + "'s Portfolio";
     if (!firstRoute) {
       const heading = document.querySelector('.view.active [tabindex="-1"]');
       if (heading) heading.focus({ preventScroll: true });
@@ -343,6 +347,7 @@
     }
     if (me.isAdmin) {
       $('admin-btn').classList.remove('hidden');
+      if (location.hash === '#/admin') { try { await loadPanel(); window.openAdminPanel(); } catch { location.hash = '/'; } }
       $('admin-btn').onclick = async () => {
         try {
           await loadPanel();

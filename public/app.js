@@ -176,6 +176,7 @@
     $('hero-name').textContent = p.name + "'s";
     $('hero-tagline').textContent = p.tagline;
     avatar($('notch-avatar'), p);
+    if ($('mobile-island-avatar')) avatar($('mobile-island-avatar'), p);
     avatar($('hero-avatar'), p);
 
     renderList('pastwork', 'pastwork-grid', 'pastwork-pager', 'Past work is coming soon.');
@@ -429,6 +430,38 @@
       applySiteSettings(db.settings || {});
     } catch {}
   }, 10000);
+
+
+  // Mobile Dynamic Island navigation: tap or swipe down to expand.
+  const mobileIsland = $('notch');
+  const islandToggle = $('mobile-island-toggle');
+  if (mobileIsland && islandToggle) {
+    let touchStartY = null;
+    const setIslandOpen = (open) => {
+      mobileIsland.classList.toggle('mobile-open', open);
+      islandToggle.setAttribute('aria-expanded', String(open));
+      islandToggle.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+    };
+    islandToggle.addEventListener('click', () => setIslandOpen(!mobileIsland.classList.contains('mobile-open')));
+    mobileIsland.addEventListener('touchstart', (event) => {
+      if (event.touches.length === 1) touchStartY = event.touches[0].clientY;
+    }, { passive: true });
+    mobileIsland.addEventListener('touchend', (event) => {
+      if (touchStartY === null) return;
+      const delta = event.changedTouches[0].clientY - touchStartY;
+      if (delta > 35) setIslandOpen(true);
+      if (delta < -35) setIslandOpen(false);
+      touchStartY = null;
+    }, { passive: true });
+    document.addEventListener('click', (event) => {
+      if (mobileIsland.classList.contains('mobile-open') && !mobileIsland.contains(event.target)) setIslandOpen(false);
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') setIslandOpen(false);
+    });
+    mobileIsland.querySelectorAll('a[data-route]').forEach((link) => link.addEventListener('click', () => setIslandOpen(false)));
+    window.addEventListener('hashchange', () => setIslandOpen(false));
+  }
 
   window.addEventListener('hashchange', route);
   window.addEventListener('content-changed', (e) => {

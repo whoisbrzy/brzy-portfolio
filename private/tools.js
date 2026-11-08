@@ -1647,7 +1647,7 @@
   const grid = $('tools-grid');
   TOOLS.forEach((t) => {
     const li = el('li');
-    const b = el('button', 'group flex h-full w-full flex-col items-start gap-3 rounded-3xl border border-white/10 bg-black/40 p-5 text-left backdrop-blur transition-colors hover:bg-white/[0.07]');
+    const b = el('button', 'group flex h-full w-full flex-col items-start gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5 text-left transition-colors duration-300 hover:border-white/15 hover:bg-white/[0.05]');
     b.type = 'button';
     const ico = el('span', 'grid h-11 w-11 place-items-center rounded-2xl border border-white/15 bg-white/5 text-white');
     ico.innerHTML = `<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${t.icon}</svg>`; // static markup from this file

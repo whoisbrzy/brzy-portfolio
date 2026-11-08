@@ -245,6 +245,11 @@ const SCHEMAS = {
     if (!str(b.label) || link === null) return null;
     return { label: str(b.label, 60), value: str(b.value, 120), url: link };
   },
+  reviews: (b) => {
+    const rating = Math.max(1, Math.min(5, Number(b.rating) || 5));
+    if (!str(b.name) || !str(b.quote)) return null;
+    return { name: str(b.name, 80), role: str(b.role, 100), quote: str(b.quote, 600), rating };
+  },
 };
 const BAD_FIELDS = 'Check the fields: a title is required and links must start with http(s).';
 

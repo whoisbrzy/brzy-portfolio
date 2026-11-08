@@ -91,7 +91,88 @@
       }
     }
   </style>
-</head>
+
+  <!-- Explicit mobile navigation styles (kept outside Tailwind processing). -->
+  <style>
+    @media (max-width: 767px) {
+      header { padding-left: 0 !important; padding-right: 0 !important; }
+      #notch {
+        display: flex !important;
+        width: max-content !important;
+        max-width: calc(100vw - 28px) !important;
+        min-width: 0 !important;
+        margin: max(8px, env(safe-area-inset-top)) auto 0 !important;
+        padding: 5px 9px !important;
+        flex-wrap: nowrap !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0 !important;
+        border: 1px solid rgba(255,255,255,.14) !important;
+        border-radius: 999px !important;
+        background: rgba(8,8,9,.96) !important;
+        box-shadow: 0 10px 34px rgba(0,0,0,.5) !important;
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        transition: width .32s ease, border-radius .32s ease, padding .32s ease !important;
+      }
+      #mobile-island-toggle { display: flex !important; }
+      #notch > a[data-route="home"],
+      #notch > ul,
+      #notch > div { display: none !important; }
+      #notch.mobile-open {
+        display: flex !important;
+        width: min(420px, calc(100vw - 24px)) !important;
+        max-width: calc(100vw - 24px) !important;
+        padding: 12px 14px 14px !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+        border-radius: 28px !important;
+      }
+      #notch.mobile-open #mobile-island-toggle {
+        display: flex !important;
+        align-self: center !important;
+      }
+      #notch.mobile-open #mobile-island-chevron { transform: rotate(180deg); }
+      #notch.mobile-open > ul {
+        display: flex !important;
+        position: static !important;
+        order: 0 !important;
+        width: 100% !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 4px !important;
+        padding-top: 8px !important;
+        border-top: 1px solid rgba(255,255,255,.09) !important;
+        transform: none !important;
+      }
+      #notch.mobile-open > ul a {
+        display: flex !important;
+        width: 100% !important;
+        justify-content: flex-start !important;
+        padding: 11px 12px !important;
+        border-radius: 13px !important;
+        font-size: 14px !important;
+      }
+      #notch.mobile-open > div {
+        display: flex !important;
+        width: 100% !important;
+        justify-content: stretch !important;
+        padding-top: 10px !important;
+        border-top: 1px solid rgba(255,255,255,.09) !important;
+      }
+      #notch.mobile-open > div button,
+      #notch.mobile-open > div a {
+        display: flex !important;
+        flex: 1 !important;
+        justify-content: center !important;
+        min-height: 40px !important;
+      }
+      #global-announcement { top: calc(68px + env(safe-area-inset-top)) !important; }
+    }
+  </style>
+\n</head>
 <body>
   <!-- Background: ColorBends, shared by every page -->
   <div id="bg" class="fixed inset-0" aria-hidden="true"></div>
@@ -283,6 +364,6 @@
   <div id="admin-mount" class="fixed inset-0 z-[80] hidden overflow-y-auto bg-black/75 px-3 py-4 backdrop-blur-md sm:px-6 sm:py-8" aria-modal="true" role="dialog" aria-label="Admin dashboard"></div>
 
   <script src="/colorbends.js"></script>
-  <script src="/app.js"></script>
+  <script src="/app.js?v=mobile-island-2"></script>
 </body>
 </html>

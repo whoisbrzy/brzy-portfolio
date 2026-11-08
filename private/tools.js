@@ -782,6 +782,186 @@
   }
 
   // ============================================================
+  // Simple Bio Link Builder
+  // ============================================================
+  function bioLinkBuilder(body, c) {
+    const STORAGE_KEY = 'brzyx-biolink-draft-v1';
+    const defaults = {
+      username: 'yourname',
+      name: 'Your Name',
+      bio: 'A little introduction about yourself.',
+      accent: '#a78bfa',
+      links: [
+        { title: 'My Website', url: 'https://example.com' },
+        { title: 'Instagram', url: 'https://instagram.com/' }
+      ]
+    };
+    let state = { ...defaults, links: defaults.links.map((x) => ({ ...x })) };
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      if (saved && typeof saved === 'object') {
+        state = {
+          username: String(saved.username || defaults.username).slice(0, 24),
+          name: String(saved.name || defaults.name).slice(0, 40),
+          bio: String(saved.bio || '').slice(0, 140),
+          accent: /^#[0-9a-f]{6}$/i.test(saved.accent) ? saved.accent : defaults.accent,
+          links: Array.isArray(saved.links) ? saved.links.slice(0, 8).map((x) => ({
+            title: String(x.title || '').slice(0, 28),
+            url: String(x.url || '').slice(0, 240)
+          })) : defaults.links.map((x) => ({ ...x }))
+        };
+      }
+    } catch {}
+
+    const root = el('div', 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,.85fr)]');
+    body.append(root);
+    const editor = el('div', 'flex min-w-0 flex-col gap-4');
+    const previewWrap = el('div', 'flex min-w-0 flex-col gap-3');
+    root.append(editor, previewWrap);
+
+    const intro = el('div', 'rounded-2xl border border-white/10 bg-white/[.03] p-4');
+    const kicker = el('div', 'text-[10px] font-bold uppercase tracking-[.24em] text-violet-300');
+    kicker.textContent = 'BIO LINK STUDIO';
+    const heading = el('div', 'mt-1 text-lg font-semibold text-white');
+    heading.textContent = 'Create your page';
+    const desc = el('p', 'mt-1 text-sm leading-relaxed text-white/50');
+    desc.textContent = 'Set up the basics of your personal link page. Your draft is saved on this device.';
+    intro.append(kicker, heading, desc);
+    editor.append(intro);
+
+    function makeField(labelText, value, max, onInput, placeholder) {
+      const input = el('input', INPUT);
+      input.value = value;
+      input.maxLength = max;
+      input.placeholder = placeholder || '';
+      input.addEventListener('input', () => { onInput(input.value); drawPreview(); });
+      return field(labelText, input);
+    }
+    const identity = el('div', 'grid gap-3 sm:grid-cols-2');
+    const nameField = makeField('Display name', state.name, 40, (v) => { state.name = v; });
+    const usernameField = makeField('Username', state.username, 24, (v) => { state.username = v.toLowerCase().replace(/[^a-z0-9_]/g, ''); });
+    identity.append(nameField, usernameField);
+    editor.append(identity);
+
+    const bio = el('textarea', INPUT + ' min-h-24 resize-y');
+    bio.value = state.bio; bio.maxLength = 140; bio.placeholder = 'Write a short bio…';
+    bio.addEventListener('input', () => { state.bio = bio.value; drawPreview(); });
+    editor.append(field('Short bio', bio));
+
+    const color = el('input');
+    color.type = 'color'; color.value = state.accent;
+    color.addEventListener('input', () => { state.accent = color.value; drawPreview(); });
+    editor.append(field('Accent color', color));
+
+    const linksHead = el('div', 'flex items-center justify-between gap-3');
+    const linksTitle = el('div', 'text-sm font-semibold text-white');
+    linksTitle.textContent = 'Your links';
+    const add = button('+ Add link', BTN2, () => {
+      if (state.links.length >= 8) { c.say('You can add up to 8 links in this starter version.', true); return; }
+      state.links.push({ title: '', url: '' });
+      drawEditorLinks(); drawPreview();
+    });
+    linksHead.append(linksTitle, add);
+    editor.append(linksHead);
+    const linksList = el('div', 'flex flex-col gap-3');
+    editor.append(linksList);
+
+    function drawEditorLinks() {
+      linksList.replaceChildren();
+      state.links.forEach((link, index) => {
+        const card = el('div', 'grid gap-2 rounded-2xl border border-white/10 bg-white/[.025] p-3 sm:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)_auto]');
+        const titleInput = el('input', INPUT);
+        titleInput.placeholder = 'Link title'; titleInput.maxLength = 28; titleInput.value = link.title;
+        titleInput.addEventListener('input', () => { state.links[index].title = titleInput.value; drawPreview(); });
+        const urlInput = el('input', INPUT);
+        urlInput.placeholder = 'https://example.com'; urlInput.maxLength = 240; urlInput.inputMode = 'url'; urlInput.value = link.url;
+        urlInput.addEventListener('input', () => { state.links[index].url = urlInput.value; drawPreview(); });
+        const remove = button('Remove', BTN2, () => {
+          state.links.splice(index, 1); drawEditorLinks(); drawPreview();
+        });
+        remove.className += ' self-start';
+        card.append(titleInput, urlInput, remove);
+        linksList.append(card);
+      });
+      add.disabled = state.links.length >= 8;
+    }
+    drawEditorLinks();
+
+    const actions = el('div', 'flex flex-wrap gap-2');
+    const save = button('Save draft', BTN, () => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        c.say('Bio link draft saved on this device.');
+      } catch { c.say('Could not save this draft in your browser.', true); }
+    });
+    const reset = button('Reset draft', BTN2, () => {
+      state = { ...defaults, links: defaults.links.map((x) => ({ ...x })) };
+      editor.querySelectorAll('input').forEach((n) => { if (n.type !== 'color') n.value = ''; });
+      // Rebuild the small editor controls so all inputs reflect the defaults.
+      c.say('Draft reset. Refresh the preview to see the starter layout.');
+      location.reload();
+    });
+    actions.append(save, reset);
+    editor.append(actions);
+
+    const previewHead = el('div', 'flex items-center justify-between gap-3');
+    const previewTitle = el('div', 'text-sm font-semibold text-white');
+    previewTitle.textContent = 'Live preview';
+    const previewNote = el('div', 'text-[11px] text-white/40');
+    previewNote.textContent = 'Preview only';
+    previewHead.append(previewTitle, previewNote);
+    previewWrap.append(previewHead);
+
+    const stage = el('div', 'relative flex min-h-[540px] items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-[#09090d] p-5');
+    const glow = el('div', 'pointer-events-none absolute -left-20 -top-20 h-64 w-64 rounded-full blur-[90px]');
+    const profile = el('div', 'relative z-10 w-full max-w-[360px] rounded-[28px] border border-white/10 bg-[#111116]/90 p-6 shadow-2xl backdrop-blur-xl');
+    const avatar = el('div', 'mx-auto grid h-20 w-20 place-items-center rounded-full border border-white/15 bg-white/10 text-2xl font-bold text-white');
+    const displayName = el('div', 'mt-4 text-center text-xl font-bold tracking-tight text-white');
+    const handle = el('div', 'mt-1 text-center text-xs text-white/40');
+    const bioText = el('p', 'mx-auto mt-3 max-w-[290px] text-center text-sm leading-relaxed text-white/60');
+    const previewLinks = el('div', 'mt-6 flex flex-col gap-2');
+    const footer = el('div', 'mt-6 text-center text-[10px] font-semibold uppercase tracking-[.2em] text-white/25');
+    footer.textContent = 'MADE WITH BRZYX';
+    profile.append(avatar, displayName, handle, bioText, previewLinks, footer);
+    stage.append(glow, profile);
+    previewWrap.append(stage);
+
+    function validHref(raw) {
+      try {
+        const u = new URL(raw);
+        return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : '';
+      } catch { return ''; }
+    }
+    function drawPreview() {
+      glow.style.background = state.accent;
+      glow.style.opacity = '.22';
+      avatar.style.borderColor = state.accent + '88';
+      avatar.style.background = state.accent + '22';
+      avatar.textContent = (state.name.trim()[0] || '?').toUpperCase();
+      displayName.textContent = state.name.trim() || 'Your Name';
+      handle.textContent = '@' + (state.username || 'yourname');
+      bioText.textContent = state.bio || 'Your short bio will appear here.';
+      previewLinks.replaceChildren();
+      const links = state.links.filter((x) => x.title.trim() && validHref(x.url));
+      if (!links.length) {
+        const empty = el('div', 'rounded-xl border border-dashed border-white/15 px-3 py-4 text-center text-xs text-white/35');
+        empty.textContent = 'Your links will appear here';
+        previewLinks.append(empty);
+      }
+      links.forEach((link) => {
+        const a = el('a', 'flex min-h-12 items-center justify-center rounded-xl border border-white/10 bg-white/[.045] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10');
+        a.href = validHref(link.url);
+        a.target = '_blank'; a.rel = 'noopener noreferrer';
+        a.textContent = link.title;
+        a.style.borderColor = state.accent + '55';
+        previewLinks.append(a);
+      });
+    }
+    drawPreview();
+    c.say('Build your basic bio link page. Add a few links and save your draft; profile assets and publishing can come next.');
+  }
+
+  // ============================================================
   // 6. Roblox Clothing Showcaser
   // ============================================================
   // Pixel rectangles [x, y, w, h] on Roblox's classic 585 x 559 clothing template.
@@ -1169,6 +1349,8 @@
       icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18M3 12h18"/>' },
     { id: 'icons', name: 'Icons', blurb: 'Search open icon sets, then copy the SVG or download an SVG or PNG.', mount: icons,
       icon: '<path d="m12 3 2.700 5.600 6.100.9-4.400 4.300 1 6.100L12 17l-5.400 2.900 1-6.100L3.200 9.500l6.100-.9z"/>' },
+    { id: 'biolink', name: 'Bio Link Builder', blurb: 'Create a simple personal link page with a live preview and a saved local draft.', mount: bioLinkBuilder,
+      icon: '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M14 9h4M14 13h4M7 16h11"/>' },
     { id: 'roblox', name: 'Roblox Clothing Showcaser', blurb: 'Preview Roblox clothing on a rotatable 3D avatar or in a flat 2D front, side and back showcase.', mount: clothingShowcaser,
       icon: '<path d="M8 3 3 6l2 4 2-1v11h10V9l2 1 2-4-5-3a4 4 0 0 1-8 0z"/>' },
   ];

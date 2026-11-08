@@ -967,7 +967,7 @@
 
     const view = el('div', 'flex min-w-0 flex-col items-center gap-3');
     const canvas = el('canvas', 'block h-auto w-full max-w-full rounded-2xl border border-white/10');
-    canvas.width = 1200; canvas.height = 1220;
+    canvas.width = 1200; canvas.height = 1147;
     canvas.style.aspectRatio = '585 / 559';
     canvas.setAttribute('aria-label', 'Original flat Roblox clothing template shown at its correct aspect ratio.');
     view.append(canvas);
@@ -1010,13 +1010,13 @@
     function draw() {
       const both = !!(state.shirt && state.pants);
       canvas.width = 1200;
-      canvas.height = both ? 650 : 1250;
-      canvas.style.aspectRatio = both ? '1200 / 650' : '585 / 610';
+      canvas.height = both ? 650 : 1147;
+      canvas.style.aspectRatio = both ? '1200 / 650' : '585 / 559';
       paint(canvas.getContext('2d'), canvas.width, canvas.height);
     }
     async function exportOne() {
       const both = !!(state.shirt && state.pants);
-      const cv = el('canvas'); cv.width = 2400; cv.height = both ? 1300 : 2500;
+      const cv = el('canvas'); cv.width = 2400; cv.height = both ? 1300 : 2294;
       paint(cv.getContext('2d'), cv.width, cv.height);
       download(await canvasBlob(cv), 'roblox-clothing-showcase.png');
       c.say('Downloaded the correctly proportioned flat clothing showcase.');

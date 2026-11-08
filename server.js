@@ -342,7 +342,7 @@ app.post('/api/admin/settings', requireAdmin, wrap(async (req, res) => {
   } else if (action === 'clear-message') {
     db.settings.globalMessage = null;
   } else if (action === 'refresh') {
-    db.settings.refreshAt = Date.now();
+    db.settings.refreshAt = Math.max(Date.now(), Number(db.settings.refreshAt || 0) + 1);
   } else return res.status(400).json({ error: 'Unknown website control.' });
   await saveDb(db);
   res.setHeader('Cache-Control', 'no-store');

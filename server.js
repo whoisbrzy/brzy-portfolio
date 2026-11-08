@@ -94,15 +94,32 @@ async function saveDb(db) {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
 }
 
-// The public address of this site as the visitor sees it (works behind Vercel's proxy).
+// Use a configured canonical origin in production; never build OAuth URLs from
+// attacker-controlled Host / X-Forwarded-* headers.
+const SITE_ORIGIN = (process.env.SITE_ORIGIN || (ON_VERCEL ? 'https://brzyx.vercel.app' : '')).replace(/\\/$/, '');
 function origin(req) {
-  const first = (v) => String(v || '').split(',')[0].trim();
-  const proto = first(req.headers['x-forwarded-proto']) || req.protocol || 'http';
-  const host = first(req.headers['x-forwarded-host']) || req.headers.host || 'localhost';
-  return `${proto}://${host}`;
+  if (SITE_ORIGIN) return SITE_ORIGIN;
+  const host = String(req.headers.host || 'localhost').toLowerCase();
+  if (!/^(localhost|127\\.0\\.0\\.1)(:\\d{1,5})?$/.test(host)) return 'http://localhost:' + PORT;
+  return `http://${host}`;
 }
-const isSecure = (req) => origin(req).startsWith('https://');
-const redirectUri = (req) => REDIRECT_OVERRIDE || `${origin(req)}/auth/discord`;
+const isSecure = () => SITE_ORIGIN.startsWith('https://');
+const redirectUri = () => REDIRECT_OVERRIDE || `${origin({})}/auth/discord`;
+const spotifyRedirectUri = () => SPOTIFY_REDIRECT_OVERRIDE || `${origin({})}/auth/spotify`;
+
+function requireSameOrigin(req, res, next) {
+  const requestOrigin = req.get('origin');
+  const expectedOrigin = SITE_ORIGIN || origin(req);
+  if (!requestOrigin) return res.status(403).json({ error: 'Origin header required.' });
+  try {
+    if (new URL(requestOrigin).origin !== expectedOrigin) {
+      return res.status(403).json({ error: 'Cross-origin request blocked.' });
+    }
+  } catch {
+    return res.status(403).json({ error: 'Invalid request origin.' });
+  }
+  next();
+}
 
 // --- signed cookies ---
 const sign = (v) => crypto.createHmac('sha256', SECRET).update(v).digest('base64url');
@@ -125,7 +142,7 @@ const parseCookies = (req) =>
   Object.fromEntries((req.headers.cookie || '').split(';').map((c) => c.trim().split(/=(.*)/s).slice(0, 2)).filter(([k]) => k));
 function setCookie(req, res, name, value, maxAgeSec) {
   const parts = [`${name}=${value}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${maxAgeSec}`];
-  if (isSecure(req)) parts.push('Secure');
+  if (isSecure()) parts.push('Secure');
   const prev = res.getHeader('Set-Cookie') || [];
   res.setHeader('Set-Cookie', [].concat(prev, parts.join('; ')));
 }
@@ -137,6 +154,14 @@ app.use(express.json({ limit: '200kb' }));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (ON_VERCEL) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+  next();
+});
+// Cookie-authenticated state changes must originate from this exact site.
+app.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return requireSameOrigin(req, res, next);
   next();
 });
 
@@ -165,8 +190,6 @@ function requireAdmin(req, res, next) {
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
 const SPOTIFY_REDIRECT_OVERRIDE = process.env.SPOTIFY_REDIRECT_URI || '';
-const spotifyRedirectUri = (req) => SPOTIFY_REDIRECT_OVERRIDE || `${origin(req)}/auth/spotify`;
-
 app.get('/auth/spotify', async (req, res) => {
   if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) return res.status(503).send('Spotify is not configured yet. Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Vercel.');
   if (req.query.code) {
@@ -177,7 +200,7 @@ app.get('/auth/spotify', async (req, res) => {
       const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
         method: 'POST',
         headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ grant_type: 'authorization_code', code: String(req.query.code), redirect_uri: spotifyRedirectUri(req) }),
+        body: new URLSearchParams({ grant_type: 'authorization_code', code: String(req.query.code), redirect_uri: spotifyRedirectUri() }),
       });
       const tokens = await tokenRes.json();
       if (!tokenRes.ok || !tokens.refresh_token) return res.redirect('/?spotify=failed');
@@ -197,7 +220,7 @@ app.get('/auth/spotify', async (req, res) => {
   url.search = new URLSearchParams({
     client_id: SPOTIFY_CLIENT_ID,
     response_type: 'code',
-    redirect_uri: spotifyRedirectUri(req),
+    redirect_uri: spotifyRedirectUri(),
     scope: 'user-read-currently-playing user-read-playback-state playlist-read-private',
     state,
   }).toString();
@@ -267,7 +290,7 @@ function startLogin(req, res) {
   url.search = new URLSearchParams({
     client_id: CLIENT_ID,
     response_type: 'code',
-    redirect_uri: redirectUri(req),
+    redirect_uri: redirectUri(),
     scope: 'identify',
     state,
   }).toString();
@@ -331,8 +354,30 @@ app.get('/api/me', (req, res) => {
 
 // --- public content ---
 app.get('/api/content', wrap(async (req, res) => {
+  const db = await loadDb();
+  // Only expose fields used by the public website. Never serialize private
+  // collections (for example bioProfiles and their ownerId values).
   res.setHeader('Cache-Control', 'no-store');
-  res.json(await loadDb());
+  res.json({
+    profile: {
+      name: str(db.profile?.name, 80),
+      tagline: str(db.profile?.tagline, 240),
+      avatar: typeof db.profile?.avatar === 'string' ? db.profile.avatar : ''
+    },
+    pastwork: Array.isArray(db.pastwork) ? db.pastwork : [],
+    projects: Array.isArray(db.projects) ? db.projects : [],
+    contacts: Array.isArray(db.contacts) ? db.contacts : [],
+    clients: Array.isArray(db.clients) ? db.clients : [],
+    reviews: Array.isArray(db.reviews) ? db.reviews : [],
+    settings: {
+      maintenance: !!db.settings?.maintenance,
+      maintenanceMessage: str(db.settings?.maintenanceMessage, 240),
+      globalMessage: db.settings?.globalMessage && typeof db.settings.globalMessage === 'object'
+        ? { id: str(db.settings.globalMessage.id, 80), text: str(db.settings.globalMessage.text, 240), type: ['info', 'success', 'warning'].includes(db.settings.globalMessage.type) ? db.settings.globalMessage.type : 'info', updatedAt: Number(db.settings.globalMessage.updatedAt) || 0 }
+        : null,
+      refreshAt: Number(db.settings?.refreshAt) || 0
+    }
+  });
 }));
 
 // --- Tools: only sent to signed-in Discord users ---
@@ -598,6 +643,8 @@ app.put('/api/admin/:type/:id', requireAdmin, wrap(async (req, res) => {
 
 app.delete('/api/admin/:type/:id', requireAdmin, wrap(async (req, res) => {
   const type = req.params.type;
+  const allowedTypes = new Set([...Object.keys(SCHEMAS), 'clients']);
+  if (!allowedTypes.has(type)) return res.status(404).json({ error: 'Unknown section' });
   const db = await loadDb();
   if (!Array.isArray(db[type])) return res.status(404).json({ error: 'Unknown section' });
   const before = db[type].length;
@@ -626,8 +673,9 @@ async function fetchInvite(code) {
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: err.message || 'Server error' });
+  console.error('Request failed:', err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'An unexpected server error occurred.' });
 });
 
 // Vercel imports the app; locally we start a server.

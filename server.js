@@ -78,6 +78,8 @@ async function loadDb() {
     if (Array.isArray(value) && !Array.isArray(db[key])) db[key] = [];
   }
   if (!db.profile) db.profile = structuredClone(SEED.profile);
+  if (!db.settings || typeof db.settings !== 'object') db.settings = {};
+  db.settings = { maintenance: false, maintenanceMessage: 'We are performing scheduled maintenance. Please check back soon.', globalMessage: null, refreshAt: 0, ...db.settings };
   return db;
 }
 async function saveDb(db) {
@@ -324,6 +326,28 @@ app.get('/api/content', wrap(async (req, res) => {
 // --- admin-only panel assets (never sent to anyone else) ---
 app.get('/admin/panel.html', requireAdmin, (req, res) => res.type('html').set('Cache-Control', 'no-store').send(PANEL_HTML));
 app.get('/admin/panel.js', requireAdmin, (req, res) => res.type('js').set('Cache-Control', 'no-store').send(PANEL_JS));
+
+
+app.post('/api/admin/settings', requireAdmin, wrap(async (req, res) => {
+  const db = await loadDb();
+  const action = str(req.body.action, 32);
+  db.settings ||= { maintenance: false, maintenanceMessage: '', globalMessage: null, refreshAt: 0 };
+  if (action === 'maintenance') {
+    db.settings.maintenance = !!req.body.enabled;
+    db.settings.maintenanceMessage = str(req.body.message, 240) || 'We are performing scheduled maintenance. Please check back soon.';
+  } else if (action === 'global-message') {
+    const message = str(req.body.message, 240);
+    if (!message) return res.status(400).json({ error: 'Enter a message first.' });
+    db.settings.globalMessage = { id: crypto.randomUUID(), text: message, type: ['info', 'success', 'warning'].includes(req.body.type) ? req.body.type : 'info', updatedAt: Date.now() };
+  } else if (action === 'clear-message') {
+    db.settings.globalMessage = null;
+  } else if (action === 'refresh') {
+    db.settings.refreshAt = Date.now();
+  } else return res.status(400).json({ error: 'Unknown website control.' });
+  await saveDb(db);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, settings: db.settings });
+}));
 
 // --- admin API ---
 const str = (v, max = 500) => String(v ?? '').trim().slice(0, max);

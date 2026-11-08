@@ -1,0 +1,264 @@
+import express from 'express';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// --- tiny .env loader (no extra dependency) ---
+const envFile = path.join(__dirname, '.env');
+if (fs.existsSync(envFile)) {
+  for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+    if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  }
+}
+
+const PORT = Number(process.env.PORT || 3000);
+const BASE_URL = (process.env.BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
+const CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
+const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
+const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${BASE_URL}/auth/callback`;
+const ADMIN_IDS = (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
+const SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+const SECURE = BASE_URL.startsWith('https://');
+if (!process.env.SESSION_SECRET) console.warn('SESSION_SECRET not set: logins reset on every restart.');
+
+// --- storage ---
+const DATA_DIR = path.join(__dirname, 'data');
+const DB_FILE = path.join(DATA_DIR, 'db.json');
+const SEED_FILE = path.join(DATA_DIR, 'seed.json');
+fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!fs.existsSync(DB_FILE)) fs.copyFileSync(SEED_FILE, DB_FILE);
+const loadDb = () => JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+const saveDb = (db) => fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+
+// --- signed cookies ---
+const sign = (v) => crypto.createHmac('sha256', SECRET).update(v).digest('base64url');
+function makeToken(payload) {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  return `${body}.${sign(body)}`;
+}
+function readToken(token) {
+  if (!token || !token.includes('.')) return null;
+  const [body, sig] = token.split('.');
+  const good = Buffer.from(sign(body));
+  const given = Buffer.from(sig || '');
+  if (good.length !== given.length || !crypto.timingSafeEqual(good, given)) return null;
+  try {
+    const p = JSON.parse(Buffer.from(body, 'base64url').toString());
+    return p.exp && p.exp > Date.now() ? p : null;
+  } catch { return null; }
+}
+const parseCookies = (req) =>
+  Object.fromEntries((req.headers.cookie || '').split(';').map((c) => c.trim().split(/=(.*)/s).slice(0, 2)).filter(([k]) => k));
+function setCookie(res, name, value, maxAgeSec) {
+  const parts = [`${name}=${value}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${maxAgeSec}`];
+  if (SECURE) parts.push('Secure');
+  const prev = res.getHeader('Set-Cookie') || [];
+  res.setHeader('Set-Cookie', [].concat(prev, parts.join('; ')));
+}
+
+const app = express();
+app.disable('x-powered-by');
+app.use(express.json({ limit: '50kb' }));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+function getSession(req) {
+  return readToken(parseCookies(req).session);
+}
+const isAdmin = (s) => !!s && ADMIN_IDS.includes(s.id);
+function requireAdmin(req, res, next) {
+  const s = getSession(req);
+  if (!isAdmin(s)) return res.status(403).json({ error: 'Not authorized' });
+  req.session = s;
+  next();
+}
+
+// --- Discord login ---
+app.get('/auth/discord', (req, res) => {
+  if (!CLIENT_ID || !CLIENT_SECRET) return res.status(500).send('Discord login is not configured. Set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.');
+  const state = crypto.randomBytes(16).toString('hex');
+  setCookie(res, 'oauth_state', makeToken({ state, exp: Date.now() + 10 * 60 * 1000 }), 600);
+  const url = new URL('https://discord.com/oauth2/authorize');
+  url.search = new URLSearchParams({
+    client_id: CLIENT_ID,
+    response_type: 'code',
+    redirect_uri: REDIRECT_URI,
+    scope: 'identify',
+    state,
+    prompt: 'none',
+  }).toString();
+  res.redirect(url.toString());
+});
+
+app.get('/auth/callback', async (req, res) => {
+  try {
+    const saved = readToken(parseCookies(req).oauth_state);
+    if (!saved || !req.query.state || saved.state !== req.query.state || !req.query.code) return res.redirect('/?login=failed');
+    const tokenRes = await fetch('https://discord.com/api/v10/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        grant_type: 'authorization_code',
+        code: String(req.query.code),
+        redirect_uri: REDIRECT_URI,
+      }),
+    });
+    if (!tokenRes.ok) return res.redirect('/?login=failed');
+    const { access_token } = await tokenRes.json();
+    const meRes = await fetch('https://discord.com/api/v10/users/@me', { headers: { Authorization: `Bearer ${access_token}` } });
+    if (!meRes.ok) return res.redirect('/?login=failed');
+    const u = await meRes.json();
+    const avatar = u.avatar ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=256` : '';
+    const session = { id: u.id, name: u.global_name || u.username, avatar, exp: Date.now() + 7 * 24 * 3600 * 1000 };
+    setCookie(res, 'session', makeToken(session), 7 * 24 * 3600);
+    if (ADMIN_IDS.includes(u.id) && avatar) {
+      const db = loadDb();
+      db.profile.avatar = avatar;
+      saveDb(db);
+    }
+    res.redirect('/');
+  } catch (e) {
+    console.error(e);
+    res.redirect('/?login=failed');
+  }
+});
+
+app.post('/auth/logout', (req, res) => {
+  setCookie(res, 'session', '', 0);
+  res.json({ ok: true });
+});
+
+app.get('/api/me', (req, res) => {
+  const s = getSession(req);
+  res.json({ user: s ? { id: s.id, name: s.name, avatar: s.avatar } : null, isAdmin: isAdmin(s) });
+});
+
+// --- public content ---
+app.get('/api/content', (req, res) => {
+  res.json(loadDb());
+});
+
+// --- admin-only panel assets (never sent to anyone else) ---
+app.get('/admin/panel.html', requireAdmin, (req, res) => res.sendFile(path.join(__dirname, 'private', 'panel.html')));
+app.get('/admin/panel.js', requireAdmin, (req, res) => res.sendFile(path.join(__dirname, 'private', 'panel.js')));
+
+// --- admin API ---
+const str = (v, max = 500) => String(v ?? '').trim().slice(0, max);
+function url(v, { allowMail = false } = {}) {
+  const s = str(v, 500);
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s) || s.startsWith('/')) return s;
+  if (allowMail && /^(mailto:|tel:)/i.test(s)) return s;
+  return null;
+}
+const SCHEMAS = {
+  pastwork: (b) => {
+    const image = url(b.image), link = url(b.link);
+    if (!str(b.title) || image === null || link === null) return null;
+    return { title: str(b.title, 120), description: str(b.description, 600), image, link };
+  },
+  projects: (b) => {
+    const image = url(b.image), link = url(b.link);
+    if (!str(b.title) || image === null || link === null) return null;
+    const tags = (Array.isArray(b.tags) ? b.tags : str(b.tags).split(',')).map((t) => str(t, 24)).filter(Boolean).slice(0, 6);
+    return { title: str(b.title, 120), description: str(b.description, 600), image, link, tags };
+  },
+  contacts: (b) => {
+    const link = url(b.url, { allowMail: true });
+    if (!str(b.label) || link === null) return null;
+    return { label: str(b.label, 60), value: str(b.value, 120), url: link };
+  },
+};
+
+app.post('/api/admin/clients', requireAdmin, async (req, res) => {
+  const m = String(req.body.invite || '').trim().match(/(?:discord\.gg\/|discord(?:app)?\.com\/invite\/)?([A-Za-z0-9-]{2,32})\/?$/);
+  if (!m) return res.status(400).json({ error: 'Enter a valid Discord invite link or code.' });
+  try {
+    const info = await fetchInvite(m[1]);
+    const db = loadDb();
+    if (db.clients.some((c) => c.guildId === info.guildId)) return res.status(409).json({ error: 'That server is already in Clients.' });
+    const item = { id: crypto.randomUUID(), invite: `https://discord.gg/${m[1]}`, code: m[1], ...info, updatedAt: Date.now() };
+    db.clients.push(item);
+    saveDb(db);
+    res.json(item);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.post('/api/admin/clients/:id/refresh', requireAdmin, async (req, res) => {
+  const db = loadDb();
+  const c = db.clients.find((x) => x.id === req.params.id);
+  if (!c) return res.status(404).json({ error: 'Not found' });
+  try {
+    Object.assign(c, await fetchInvite(c.code), { updatedAt: Date.now() });
+    saveDb(db);
+    res.json(c);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.post('/api/admin/:type', requireAdmin, (req, res) => {
+  const make = SCHEMAS[req.params.type];
+  if (!make) return res.status(404).json({ error: 'Unknown section' });
+  const item = make(req.body);
+  if (!item) return res.status(400).json({ error: 'Check the fields: a title is required and links must start with http(s).' });
+  const db = loadDb();
+  const full = { id: crypto.randomUUID(), ...item };
+  db[req.params.type].push(full);
+  saveDb(db);
+  res.json(full);
+});
+
+app.put('/api/admin/:type/:id', requireAdmin, (req, res) => {
+  const make = SCHEMAS[req.params.type];
+  if (!make) return res.status(404).json({ error: 'Unknown section' });
+  const item = make(req.body);
+  if (!item) return res.status(400).json({ error: 'Check the fields: a title is required and links must start with http(s).' });
+  const db = loadDb();
+  const i = db[req.params.type].findIndex((x) => x.id === req.params.id);
+  if (i < 0) return res.status(404).json({ error: 'Not found' });
+  db[req.params.type][i] = { id: req.params.id, ...item };
+  saveDb(db);
+  res.json(db[req.params.type][i]);
+});
+
+app.delete('/api/admin/:type/:id', requireAdmin, (req, res) => {
+  const type = req.params.type;
+  const db = loadDb();
+  if (!Array.isArray(db[type]) || type === 'profile') return res.status(404).json({ error: 'Unknown section' });
+  const before = db[type].length;
+  db[type] = db[type].filter((x) => x.id !== req.params.id);
+  if (db[type].length === before) return res.status(404).json({ error: 'Not found' });
+  saveDb(db);
+  res.json({ ok: true });
+});
+
+async function fetchInvite(code) {
+  const r = await fetch(`https://discord.com/api/v10/invites/${encodeURIComponent(code)}?with_counts=true`);
+  if (r.status === 404) throw new Error('That invite does not exist or has expired.');
+  if (!r.ok) throw new Error(`Discord returned ${r.status}. Try again in a moment.`);
+  const d = await r.json();
+  if (!d.guild) throw new Error('That invite does not point to a server.');
+  return {
+    guildId: d.guild.id,
+    name: d.guild.name,
+    icon: d.guild.icon ? `https://cdn.discordapp.com/icons/${d.guild.id}/${d.guild.icon}.png?size=128` : '',
+    members: d.approximate_member_count ?? 0,
+    online: d.approximate_presence_count ?? 0,
+  };
+}
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.listen(PORT, () => console.log(`brzy-portfolio running at ${BASE_URL}`));

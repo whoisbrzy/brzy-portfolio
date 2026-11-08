@@ -963,12 +963,16 @@
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || 'Could not unpublish your page.');
         publishedInfo.replaceChildren();
+        publishedInfo.classList.add('hidden');
+        unpublish.disabled = true;
         c.say('Your page has been unpublished.');
       } catch (error) { c.say(error.message || 'Could not unpublish your page.', true); }
       finally { unpublish.disabled = false; }
     });
+    unpublish.disabled = true;
     const publishedInfo = el('div', 'hidden flex flex-wrap items-center gap-2');
     function showPublished(url) {
+      unpublish.disabled = false;
       publishedInfo.classList.remove('hidden');
       publishedInfo.replaceChildren();
       const link = el('a', 'min-w-0 break-all text-xs font-semibold text-violet-200 underline underline-offset-4', url);
@@ -1038,7 +1042,7 @@
     function validHref(raw) {
       try {
         const u = new URL(raw);
-        return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : '';
+        return u.protocol === 'https:' ? u.href : '';
       } catch { return ''; }
     }
     function drawPreview() {

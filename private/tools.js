@@ -933,9 +933,9 @@
   }
 
   function clothingShowcaser(body, c) {
-    const state = { shirt: null, pants: null, skin: '#e9b98a', bg: 'midnight', title: 'My clothing', spin: !matchMedia('(prefers-reduced-motion: reduce)').matches, angle: 20 };
-    let favicon = null, tex = null, raf = 0, drag = null;
-    loadFavicon().then((f) => { favicon = f; });
+    const state = { shirt: null, pants: null, skin: '#e9b98a', bg: 'midnight', title: 'My clothing' };
+    let favicon = null, tex = null;
+    loadFavicon().then((f) => { favicon = f; draw(); });
 
     const root = el('div', 'grid gap-5 lg:grid-cols-[18rem_1fr]');
     body.append(root);
@@ -945,38 +945,45 @@
       i.type = 'file'; i.accept = 'image/png,image/*';
       i.addEventListener('change', async () => {
         if (!i.files[0]) return;
-        try { state[key] = await loadImageFile(i.files[0]); rebuild(); c.say(`${label} applied.`); } catch (e) { c.say(e.message, true); }
+        try { state[key] = await loadImageFile(i.files[0]); rebuild(); draw(); c.say(`${label} applied.`); } catch (e) { c.say(e.message, true); }
       });
       return field(label, i);
     };
     const title = el('input', INPUT); title.value = state.title; title.maxLength = 40;
-    title.addEventListener('input', () => { state.title = title.value; });
+    title.addEventListener('input', () => { state.title = title.value; draw(); });
     const skin = el('input'); skin.type = 'color'; skin.value = state.skin;
-    skin.addEventListener('input', () => { state.skin = skin.value; rebuild(); });
+    skin.addEventListener('input', () => { state.skin = skin.value; rebuild(); draw(); });
     const bgSel = el('select', INPUT);
     [['midnight', 'Midnight'], ['aurora', 'Aurora'], ['studio', 'Studio light']].forEach(([v, t]) => { const o = el('option', '', t); o.value = v; bgSel.append(o); });
-    bgSel.addEventListener('change', () => { state.bg = bgSel.value; });
-    const spin = el('input'); spin.type = 'checkbox'; spin.checked = state.spin;
-    spin.addEventListener('change', () => { state.spin = spin.checked; });
-    const spinWrap = el('label', 'flex items-center gap-2 text-sm text-white/70'); spinWrap.append(spin, 'Auto-rotate');
-    const dlOne = button('Download this view', BTN, () => exportOne());
-    const dlSheet = button('Download 3-view sheet', BTN2, () => exportSheet());
-    const hint = el('p', 'text-xs leading-relaxed text-white/45', 'Upload the 585 × 559 Roblox shirt and pants templates (PNG with transparency). Drag the preview to turn the character. Every export carries the site favicon.');
-    side.append(pick('Shirt template', 'shirt'), pick('Pants template (optional)', 'pants'), field('Name on sheet', title), field('Skin color', skin), field('Background', bgSel), spinWrap, dlOne, dlSheet, hint);
+    bgSel.addEventListener('change', () => { state.bg = bgSel.value; draw(); });
+    const dlOne = button('Download flat showcase', BTN, () => exportOne());
+    const dlSheet = button('Download front + back', BTN2, () => exportSheet());
+    const hint = el('p', 'text-xs leading-relaxed text-white/45', 'Upload classic 585 × 559 Roblox shirt and pants templates. The clothing is shown as a clean, flat 2D front view — no 3D model, rotation or perspective. Exports include the site favicon.');
+    side.append(pick('Shirt template', 'shirt'), pick('Pants template (optional)', 'pants'), field('Name on showcase', title), field('Skin color', skin), field('Background', bgSel), dlOne, dlSheet, hint);
 
     const view = el('div', 'flex min-w-0 flex-col items-center gap-3');
-    const canvas = el('canvas', 'max-h-[64vh] max-w-full cursor-grab touch-none rounded-3xl border border-white/10');
-    canvas.width = 640; canvas.height = 800;
-    canvas.setAttribute('aria-label', 'Character preview. Drag left or right to rotate.');
+    const canvas = el('canvas', 'max-h-[70vh] max-w-full rounded-2xl border border-white/10');
+    canvas.width = 900; canvas.height = 1000;
+    canvas.setAttribute('aria-label', 'Flat 2D front view of Roblox clothing.');
     view.append(canvas);
     root.append(side, view);
 
+    function rebuild() {
+      const skinTile = el('canvas'); skinTile.width = skinTile.height = 16;
+      const sx = skinTile.getContext('2d'); sx.fillStyle = state.skin; sx.fillRect(0, 0, 16, 16);
+      tex = {
+        torso: compose([state.pants, state.shirt]),
+        arms: compose([state.shirt]),
+        legs: compose([state.pants]),
+        face: makeFace(), skinTile,
+      };
+    }
     function makeFace() {
       const f = el('canvas'); f.width = f.height = 128;
       const x = f.getContext('2d');
       x.fillStyle = state.skin; x.fillRect(0, 0, 128, 128);
       x.fillStyle = '#1a1a1a';
-      x.beginPath(); x.ellipse(44, 54, 7, 11, 0, 0, 7); x.ellipse(84, 54, 7, 11, 0, 0, 7); x.fill();
+      x.beginPath(); x.ellipse(44, 54, 7, 11, 0, 0, Math.PI * 2); x.ellipse(84, 54, 7, 11, 0, 0, Math.PI * 2); x.fill();
       x.strokeStyle = '#1a1a1a'; x.lineWidth = 6; x.lineCap = 'round';
       x.beginPath(); x.arc(64, 74, 26, 0.25 * Math.PI, 0.75 * Math.PI); x.stroke();
       return f;
@@ -988,63 +995,73 @@
       parts.forEach((im) => im && x.drawImage(im, 0, 0, t.width, t.height));
       return t;
     }
-    function rebuild() {
-      const skinTile = el('canvas'); skinTile.width = skinTile.height = 16;
-      const sx = skinTile.getContext('2d'); sx.fillStyle = state.skin; sx.fillRect(0, 0, 16, 16);
-      tex = {
-        torso: compose([state.pants, state.shirt]),
-        arms: compose([state.shirt]),
-        legs: compose([state.pants]),
-        face: makeFace(), skinTile,
+    function drawFlat(g, W, H) {
+      drawBackground(g, W, H, state.bg);
+      const unit = Math.min(W * 0.19, H * 0.19);
+      const cx = W / 2, top = H * 0.22;
+      const head = unit * 0.9, torsoW = unit * 2, torsoH = unit * 2;
+      const armW = unit * 0.78, armH = torsoH, legW = unit * 0.98, legH = unit * 1.85;
+      const torsoX = cx - torsoW / 2, torsoY = top + head + unit * 0.12;
+      const armY = torsoY, leftArmX = torsoX - armW - unit * 0.08, rightArmX = torsoX + torsoW + unit * 0.08;
+      const legY = torsoY + torsoH + unit * 0.06, leftLegX = cx - legW - unit * 0.02, rightLegX = cx + unit * 0.02;
+      g.fillStyle = state.skin;
+      g.fillRect(cx - head / 2, top, head, head);
+      g.drawImage(tex.face, cx - head / 2, top, head, head);
+      const drawPart = (img, uv, key, x, y, w, h) => {
+        const r = UV[uv][key], sx = img.width / TEMPLATE_W, sy = img.height / TEMPLATE_H;
+        g.drawImage(img, r[0] * sx, r[1] * sy, r[2] * sx, r[3] * sy, x, y, w, h);
       };
+      drawPart(tex.arms, 'rlimb', 'front', leftArmX, armY, armW, armH);
+      drawPart(tex.arms, 'llimb', 'front', rightArmX, armY, armW, armH);
+      drawPart(tex.torso, 'torso', 'front', torsoX, torsoY, torsoW, torsoH);
+      drawPart(tex.legs, 'rlimb', 'front', leftLegX, legY, legW, legH);
+      drawPart(tex.legs, 'llimb', 'front', rightLegX, legY, legW, legH);
+      g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 2;
+      g.strokeRect(cx - head / 2, top, head, head);
+      g.strokeRect(torsoX, torsoY, torsoW, torsoH);
+      g.strokeRect(leftArmX, armY, armW, armH); g.strokeRect(rightArmX, armY, armW, armH);
+      g.strokeRect(leftLegX, legY, legW, legH); g.strokeRect(rightLegX, legY, legW, legH);
     }
-    rebuild();
-
-    const studio = () => state.bg === 'studio';
-    function frame() {
-      if (state.spin && !drag) state.angle = (state.angle + 0.6) % 360;
-      const g = canvas.getContext('2d');
-      renderScene(g, canvas.width, canvas.height, { bg: state.bg, tex, figures: [{ angle: state.angle, cx: canvas.width / 2, cy: canvas.height * 0.47, scale: 118 }] });
-      drawWatermark(g, canvas.width, canvas.height, favicon, 0.8, studio());
-      raf = requestAnimationFrame(frame);
-    }
-    raf = requestAnimationFrame(frame);
-    c.cleanup(() => cancelAnimationFrame(raf));
-
-    canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, a: state.angle }; canvas.setPointerCapture(e.pointerId); canvas.classList.replace('cursor-grab', 'cursor-grabbing'); });
-    canvas.addEventListener('pointermove', (e) => { if (drag) state.angle = (drag.a + (e.clientX - drag.x) * 0.8 + 360) % 360; });
-    const end = () => { drag = null; canvas.classList.replace('cursor-grabbing', 'cursor-grab'); };
-    canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
-    canvas.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') state.angle = (state.angle - 10 + 360) % 360; if (e.key === 'ArrowRight') state.angle = (state.angle + 10) % 360; });
-    canvas.tabIndex = 0;
-
     function drawTitle(g, W, scale) {
       if (!state.title.trim()) return;
-      g.fillStyle = studio() ? '#111' : '#fff';
+      g.fillStyle = state.bg === 'studio' ? '#111' : '#fff';
       g.font = `700 ${Math.round(46 * scale)}px "SF Pro", -apple-system, sans-serif`;
       g.textAlign = 'left'; g.textBaseline = 'top';
-      g.fillText(state.title.trim(), 40 * scale, 36 * scale);
+      g.fillText(state.title.trim(), 48 * scale, 38 * scale);
+    }
+    function draw() {
+      const g = canvas.getContext('2d');
+      drawFlat(g, canvas.width, canvas.height);
+      drawTitle(g, canvas.width, 1);
+      drawWatermark(g, canvas.width, canvas.height, favicon, 0.8, state.bg === 'studio');
     }
     async function exportOne() {
-      const W = 1280, H = 1600, cv = el('canvas'); cv.width = W; cv.height = H;
+      const W = 1800, H = 2000, cv = el('canvas'); cv.width = W; cv.height = H;
       const g = cv.getContext('2d');
-      renderScene(g, W, H, { bg: state.bg, tex, figures: [{ angle: state.angle, cx: W / 2, cy: H * 0.47, scale: 236 }] });
-      drawTitle(g, W, 1.4);
-      drawWatermark(g, W, H, favicon, 1.6, studio());
-      download(await canvasBlob(cv), 'clothing-showcase.png');
-      c.say('Downloaded the showcase image.');
+      drawFlat(g, W, H); drawTitle(g, W, 2);
+      drawWatermark(g, W, H, favicon, 1.8, state.bg === 'studio');
+      download(await canvasBlob(cv), 'flat-clothing-showcase.png');
+      c.say('Downloaded the flat 2D showcase.');
     }
     async function exportSheet() {
-      const W = 1920, H = 1080, cv = el('canvas'); cv.width = W; cv.height = H;
+      const W = 2000, H = 1400, cv = el('canvas'); cv.width = W; cv.height = H;
       const g = cv.getContext('2d');
-      renderScene(g, W, H, { bg: state.bg, tex, figures: [0, 38, 180].map((angle, i) => ({ angle, cx: W * (0.2 + i * 0.3), cy: H * 0.45, scale: 150 })) });
-      drawTitle(g, W, 1.3);
-      drawWatermark(g, W, H, favicon, 1.3, studio());
-      download(await canvasBlob(cv), 'clothing-showcase-sheet.png');
-      c.say('Downloaded the 3-view sheet.');
+      drawBackground(g, W, H, state.bg);
+      drawTitle(g, W, 1.4);
+      const half = el('canvas'); half.width = 900; half.height = 1000;
+      drawFlat(half.getContext('2d'), half.width, half.height);
+      g.drawImage(half, 40, 180, 900, 1000);
+      g.save(); g.translate(W, 0); g.scale(-1, 1); g.drawImage(half, 1060, 180, 900, 1000); g.restore();
+      g.fillStyle = state.bg === 'studio' ? '#111' : '#fff';
+      g.font = '600 30px "SF Pro", -apple-system, sans-serif';
+      g.textAlign = 'center'; g.fillText('FRONT', 490, 130); g.fillText('BACK TEMPLATE', 1510, 130);
+      drawWatermark(g, W, H, favicon, 1.4, state.bg === 'studio');
+      download(await canvasBlob(cv), 'flat-clothing-showcase-sheet.png');
+      c.say('Downloaded the flat showcase sheet.');
     }
-    c.say('Upload a shirt template to dress the character.');
-    window.__showcase = { renderScene, UV, TEMPLATE_W, TEMPLATE_H }; // used by the automated test only
+    rebuild();
+    draw();
+    c.say('Upload a shirt template to create a flat 2D showcase.');
   }
 
   // ============================================================
@@ -1061,7 +1078,7 @@
       icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18M3 12h18"/>' },
     { id: 'icons', name: 'Icons', blurb: 'Search open icon sets, then copy the SVG or download an SVG or PNG.', mount: icons,
       icon: '<path d="m12 3 2.700 5.600 6.100.9-4.400 4.300 1 6.100L12 17l-5.400 2.900 1-6.100L3.200 9.500l6.100-.9z"/>' },
-    { id: 'roblox', name: 'Roblox Clothing Showcaser', blurb: 'Show your shirt and pants on a rotating character, with the site favicon on every export.', mount: clothingShowcaser,
+    { id: 'roblox', name: 'Roblox Clothing Showcaser', blurb: 'Create a clean, flat 2D front-facing clothing showcase — no 3D model.', mount: clothingShowcaser,
       icon: '<path d="M8 3 3 6l2 4 2-1v11h10V9l2 1 2-4-5-3a4 4 0 0 1-8 0z"/>' },
   ];
 

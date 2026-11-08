@@ -205,8 +205,18 @@
         const article = h('article', 'rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur');
         const stars = h('p', 'mb-4 tracking-[0.2em] text-sm text-white/80', '★'.repeat(Math.max(1, Math.min(5, Number(review.rating) || 5))) + '☆'.repeat(5 - Math.max(1, Math.min(5, Number(review.rating) || 5))));
         const quote = h('blockquote', 'text-base leading-relaxed text-white/75', '“' + review.quote + '”');
-        const byline = h('div', 'mt-6 border-t border-white/10 pt-4');
-        byline.append(h('p', 'font-semibold text-white', review.name), h('p', 'mt-1 text-xs text-white/45', review.role || 'Client'));
+        const byline = h('div', 'mt-6 flex items-center gap-3 border-t border-white/10 pt-4');
+        const avatarUrl = safeUrl(review.avatar);
+        if (avatarUrl) {
+          const img = h('img', 'h-10 w-10 shrink-0 rounded-full border border-white/10 bg-white/5 object-cover');
+          img.src = avatarUrl;
+          img.alt = review.name + ' profile picture';
+          img.loading = 'lazy';
+          byline.append(img);
+        }
+        const identity = h('div', 'min-w-0');
+        identity.append(h('p', 'truncate font-semibold text-white', review.name), h('p', 'mt-1 truncate text-xs text-white/45', review.role || 'Client'));
+        byline.append(identity);
         article.append(stars, quote, byline);
         return article;
       }) : [empty('Client reviews will appear here soon.')])

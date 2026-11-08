@@ -40,8 +40,13 @@
       .client-logo { display: grid; width: 3.5rem; height: 3.5rem; flex: 0 0 auto; place-items: center; opacity: .58; filter: grayscale(1); transition: opacity .2s ease, filter .2s ease; }
       .client-logo:hover { opacity: 1; filter: grayscale(0); }
       .client-logo img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 1rem; }
-      #spotify-island { width: 42px; height: 42px; overflow: hidden; transition: width .45s cubic-bezier(.2,.8,.2,1), height .35s ease, border-radius .35s ease, opacity .25s ease; }
-      #spotify-island.active { width: min(390px, calc(100vw - 28px)); height: 64px; }
+      /* A compact, black Dynamic Island that springs open around the playing track. */
+      #spotify-island { width: 116px; height: 36px; overflow: hidden; border-radius: 999px; border: 1px solid rgba(255,255,255,.10); background: #020202; box-shadow: 0 8px 28px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.08); transition: width .55s cubic-bezier(.2,.9,.2,1.15), height .4s cubic-bezier(.2,.8,.2,1), border-radius .35s ease, box-shadow .35s ease; }
+      #spotify-island::before { content: ""; position: absolute; inset: 3px 28% auto; height: 2px; border-radius: 999px; background: rgba(255,255,255,.08); pointer-events: none; }
+      #spotify-island.active { width: min(390px, calc(100vw - 28px)); height: 72px; border-radius: 26px; box-shadow: 0 16px 48px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.05), inset 0 1px 0 rgba(255,255,255,.12); }
+      #spotify-island:not(.active) .spotify-wave { margin: auto; }
+      #notch { border: 1px solid rgba(255,255,255,.12); border-radius: 999px; background: rgba(3,3,3,.92); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); transition: transform .4s cubic-bezier(.2,.8,.2,1), border-color .35s ease, box-shadow .35s ease; }
+      #notch.spotify-playing { transform: translateY(3px) scale(.99); border-color: rgba(30,215,96,.22); box-shadow: 0 18px 55px -12px rgba(0,0,0,.95), 0 0 24px rgba(30,215,96,.06); }
       #spotify-island .island-details { opacity: 0; transform: translateY(5px); transition: opacity .2s ease .12s, transform .3s ease .08s; }
       #spotify-island.active .island-details { opacity: 1; transform: translateY(0); }
       #spotify-island .island-art { width: 0; height: 0; opacity: 0; transition: all .3s ease; }
@@ -64,7 +69,7 @@
   <div id="veil-page" class="veil pointer-events-none fixed inset-0 bg-black/80 opacity-0" aria-hidden="true"></div>
 
   <!-- Spotify Dynamic Island -->
-  <div id="spotify-island" class="fixed left-1/2 top-3 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-black px-2 shadow-[0_12px_40px_rgba(0,0,0,.65)]" aria-live="polite" aria-label="Spotify playback">
+  <div id="spotify-island" class="fixed left-1/2 top-2 z-[60] flex -translate-x-1/2 items-center justify-center gap-3 px-3" aria-live="polite" aria-label="Spotify playback">
     <div class="spotify-wave flex h-6 w-5 shrink-0 items-center justify-center gap-0.5" aria-hidden="true"><span></span><span></span><span></span></div>
     <img id="spotify-art" class="island-art shrink-0 rounded-lg object-cover" alt="" />
     <div class="island-details min-w-0 flex-1">
@@ -76,8 +81,8 @@
   </div>
 
   <!-- Notch -->
-  <header class="fixed inset-x-0 top-0 z-50 flex justify-center px-3">
-    <nav id="notch" aria-label="Main" class="flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-b-[28px] border-x border-b border-white/10 bg-black px-4 py-3 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.9)] md:px-6">
+  <header class="fixed inset-x-0 top-14 z-50 flex justify-center px-3">
+    <nav id="notch" aria-label="Main" class="flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[28px] border border-white/10 bg-black/90 px-4 py-3 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.9)] md:px-6">
       <a href="#/" data-route="home" class="flex items-center gap-2.5 rounded-full" aria-label="brzy, home">
         <span id="notch-avatar" class="grid h-8 w-8 place-items-center overflow-hidden rounded-full bg-white/10 text-sm font-bold"></span>
         <span class="text-sm font-bold" id="notch-name">brzy</span>

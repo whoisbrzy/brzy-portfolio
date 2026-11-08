@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -23,36 +23,52 @@
       /* SF Pro only. Uses the copy installed on the visitor's device (Apple devices ship it). */
       @font-face { font-family: 'SF Pro'; src: local('SF Pro Text'), local('SFProText-Regular'), local('.SF NS'), local('-apple-system'); font-weight: 400 500; }
       @font-face { font-family: 'SF Pro'; src: local('SF Pro Display'), local('SFProDisplay-Bold'), local('.SF NS'), local('-apple-system'); font-weight: 600 800; }
-      html { background: #000; color-scheme: dark; }
-      body { @apply font-sf bg-black text-white antialiased; letter-spacing: -0.01em; }
+      html, body { height: 100%; overflow: hidden; background: #000; color-scheme: dark; }
+      body { @apply font-sf text-white antialiased; letter-spacing: -0.01em; }
       :focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+    }
+    @layer components {
+      /* Each page fills the screen; only the active one is visible and focusable. */
+      .view { position: absolute; inset: 0; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .25s ease, visibility 0s linear .25s; }
+      .view.active { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .25s ease; }
+      .veil { transition: opacity .35s ease; }
+      .no-bar { scrollbar-width: none; }
+      .no-bar::-webkit-scrollbar { display: none; }
+      @media (prefers-reduced-motion: reduce) {
+        .view, .view.active, .veil { transition: none; }
+      }
     }
   </style>
 </head>
 <body>
+  <!-- Background: ColorBends, shared by every page -->
+  <div id="bg" class="fixed inset-0" aria-hidden="true"></div>
+  <div id="veil-home" class="veil pointer-events-none fixed inset-0 bg-gradient-to-b from-black/80 via-black/55 to-black" aria-hidden="true"></div>
+  <div id="veil-page" class="veil pointer-events-none fixed inset-0 bg-black/80 opacity-0" aria-hidden="true"></div>
+
   <!-- Notch -->
   <header class="fixed inset-x-0 top-0 z-50 flex justify-center px-3">
     <nav id="notch" aria-label="Main" class="flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-b-[28px] border-x border-b border-white/10 bg-black px-4 py-3 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.9)] md:px-6">
-      <a href="#top" class="flex items-center gap-2.5 rounded-full" aria-label="brzy, back to top">
+      <a href="#/" data-route="home" class="flex items-center gap-2.5 rounded-full" aria-label="brzy, home">
         <span id="notch-avatar" class="grid h-8 w-8 place-items-center overflow-hidden rounded-full bg-white/10 text-sm font-bold"></span>
         <span class="text-sm font-bold" id="notch-name">brzy</span>
       </a>
 
-      <ul class="order-3 flex w-full items-center justify-center gap-1 text-sm font-medium text-white/60 md:order-none md:w-auto">
+      <ul class="order-3 flex w-full items-center justify-center gap-1 text-sm font-medium md:order-none md:w-auto">
         <li>
-          <a href="#past-work" class="flex items-center gap-2 rounded-full px-3 py-1.5 transition-colors hover:bg-white/10 hover:text-white">
+          <a href="#/past-work" data-route="past-work" class="nav-link flex items-center gap-2 rounded-full px-3 py-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
             Past Work
           </a>
         </li>
         <li>
-          <a href="#projects" class="flex items-center gap-2 rounded-full px-3 py-1.5 transition-colors hover:bg-white/10 hover:text-white">
+          <a href="#/projects" data-route="projects" class="nav-link flex items-center gap-2 rounded-full px-3 py-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>
             Projects
           </a>
         </li>
         <li>
-          <a href="#contact" class="flex items-center gap-2 rounded-full px-3 py-1.5 transition-colors hover:bg-white/10 hover:text-white">
+          <a href="#/contact" data-route="contact" class="nav-link flex items-center gap-2 rounded-full px-3 py-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             Contact
           </a>
@@ -70,59 +86,54 @@
     </nav>
   </header>
 
-  <main id="top">
-    <!-- Hero -->
-    <section id="hero" class="relative flex min-h-screen items-center justify-center overflow-hidden px-6 pt-28 pb-20">
-      <div id="hero-bg" class="absolute inset-0" aria-hidden="true"></div>
-      <div class="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/80 via-black/55 to-black"></div>
-
-      <div class="relative mx-auto flex max-w-2xl flex-col items-center text-center">
+  <main id="views" class="relative h-full">
+    <!-- Home -->
+    <section data-view="home" class="view active flex items-center justify-center px-6 pt-36 pb-24 md:pt-28" aria-labelledby="home-title">
+      <div class="mx-auto flex max-w-2xl flex-col items-center text-center">
         <div id="hero-avatar" class="mb-6 grid h-24 w-24 place-items-center overflow-hidden rounded-full border border-white/20 bg-white/10 text-4xl font-bold shadow-2xl"></div>
-        <h1 class="text-5xl font-bold tracking-tight sm:text-7xl"><span id="hero-name">brzy's</span> <span class="text-white/55">Portfolio</span></h1>
+        <h1 id="home-title" tabindex="-1" class="text-5xl font-bold tracking-tight sm:text-7xl"><span id="hero-name">brzy's</span> <span class="text-white/55">Portfolio</span></h1>
         <p id="hero-tagline" class="mt-6 max-w-xl text-base leading-relaxed text-white/60 sm:text-lg"></p>
         <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
-          <a href="#past-work" class="flex items-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-[1.03]">
+          <a href="#/past-work" class="flex items-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-[1.03]">
             Past Work
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </a>
-          <a href="#projects" class="rounded-2xl border border-white/15 bg-black/40 px-6 py-3 text-sm font-semibold backdrop-blur transition-colors hover:bg-white/10">Projects</a>
-          <a href="#contact" class="rounded-2xl border border-white/15 bg-black/40 px-6 py-3 text-sm font-semibold backdrop-blur transition-colors hover:bg-white/10">Contact</a>
+          <a href="#/projects" class="rounded-2xl border border-white/15 bg-black/40 px-6 py-3 text-sm font-semibold backdrop-blur transition-colors hover:bg-white/10">Projects</a>
+          <a href="#/contact" class="rounded-2xl border border-white/15 bg-black/40 px-6 py-3 text-sm font-semibold backdrop-blur transition-colors hover:bg-white/10">Contact</a>
         </div>
       </div>
+      <ul id="clients-strip" class="absolute inset-x-0 bottom-6 mx-auto hidden max-w-3xl flex-wrap items-center justify-center gap-3 px-6"></ul>
     </section>
 
     <!-- Past Work -->
-    <section id="past-work" class="mx-auto max-w-6xl scroll-mt-28 px-6 py-24">
-      <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Past Work</h2>
-      <p class="mt-3 max-w-lg text-white/55">Finished jobs for clients and communities.</p>
-      <div id="pastwork-grid" class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"></div>
+    <section data-view="past-work" class="view" aria-labelledby="pw-title">
+      <div class="mx-auto flex h-full max-w-6xl flex-col px-6 pt-36 pb-6 md:pt-28">
+        <h2 id="pw-title" tabindex="-1" class="text-3xl font-bold tracking-tight sm:text-4xl">Past Work</h2>
+        <p class="mt-2 max-w-lg text-white/55">Finished jobs for clients and communities.</p>
+        <div id="pastwork-grid" class="no-bar mt-6 grid min-h-0 flex-1 content-center gap-5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3"></div>
+        <div id="pastwork-pager" class="flex min-h-10 items-center justify-center gap-3 pt-4"></div>
+      </div>
     </section>
 
     <!-- Projects -->
-    <section id="projects" class="mx-auto max-w-6xl scroll-mt-28 px-6 py-24">
-      <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Projects</h2>
-      <p class="mt-3 max-w-lg text-white/55">Things I build and ship on my own.</p>
-      <div id="projects-grid" class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"></div>
-    </section>
-
-    <!-- Clients -->
-    <section id="clients" class="mx-auto hidden max-w-6xl scroll-mt-28 px-6 py-24">
-      <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Clients</h2>
-      <p class="mt-3 max-w-lg text-white/55">Communities I've worked with.</p>
-      <ul id="clients-list" class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></ul>
+    <section data-view="projects" class="view" aria-labelledby="pr-title">
+      <div class="mx-auto flex h-full max-w-6xl flex-col px-6 pt-36 pb-6 md:pt-28">
+        <h2 id="pr-title" tabindex="-1" class="text-3xl font-bold tracking-tight sm:text-4xl">Projects</h2>
+        <p class="mt-2 max-w-lg text-white/55">Things I build and ship on my own.</p>
+        <div id="projects-grid" class="no-bar mt-6 grid min-h-0 flex-1 content-center gap-5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3"></div>
+        <div id="projects-pager" class="flex min-h-10 items-center justify-center gap-3 pt-4"></div>
+      </div>
     </section>
 
     <!-- Contact -->
-    <section id="contact" class="mx-auto max-w-6xl scroll-mt-28 px-6 py-24">
-      <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Contact</h2>
-      <p class="mt-3 max-w-lg text-white/55">Have a job in mind? Reach me here.</p>
-      <ul id="contact-list" class="mt-10 flex flex-wrap gap-3"></ul>
+    <section data-view="contact" class="view flex items-center justify-center px-6 pt-36 pb-12 md:pt-28" aria-labelledby="ct-title">
+      <div class="mx-auto flex max-w-2xl flex-col items-center text-center">
+        <h2 id="ct-title" tabindex="-1" class="text-3xl font-bold tracking-tight sm:text-5xl">Contact</h2>
+        <p class="mt-3 max-w-lg text-white/55">Have a job in mind? Reach me here.</p>
+        <ul id="contact-list" class="mt-8 flex flex-wrap items-center justify-center gap-3"></ul>
+      </div>
     </section>
   </main>
-
-  <footer class="border-t border-white/10 px-6 py-8 text-center text-sm text-white/40">
-    <span id="footer-name">brzy</span>
-  </footer>
 
   <div id="admin-mount"></div>
 

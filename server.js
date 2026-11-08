@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// --- tiny .env loader (no extra dependency) ---
+// --- tiny .env loader for local use (Vercel injects env vars itself) ---
 const envFile = path.join(__dirname, '.env');
 if (fs.existsSync(envFile)) {
   for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
@@ -15,24 +15,53 @@ if (fs.existsSync(envFile)) {
   }
 }
 
+const ON_VERCEL = !!process.env.VERCEL;
 const PORT = Number(process.env.PORT || 3000);
-const BASE_URL = (process.env.BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
+const BASE_URL = (process.env.BASE_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : `http://localhost:${PORT}`)).replace(/\/$/, '');
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
 const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${BASE_URL}/auth/callback`;
 const ADMIN_IDS = (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
 const SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const SECURE = BASE_URL.startsWith('https://');
-if (!process.env.SESSION_SECRET) console.warn('SESSION_SECRET not set: logins reset on every restart.');
+if (!process.env.SESSION_SECRET) console.warn('SESSION_SECRET not set: logins will not survive restarts or work across serverless instances.');
 
-// --- storage ---
-const DATA_DIR = path.join(__dirname, 'data');
-const DB_FILE = path.join(DATA_DIR, 'db.json');
-const SEED_FILE = path.join(DATA_DIR, 'seed.json');
-fs.mkdirSync(DATA_DIR, { recursive: true });
-if (!fs.existsSync(DB_FILE)) fs.copyFileSync(SEED_FILE, DB_FILE);
-const loadDb = () => JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-const saveDb = (db) => fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+// --- files read once at startup (literal paths so Vercel bundles them) ---
+const SEED = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'seed.json'), 'utf8'));
+const PANEL_HTML = fs.readFileSync(path.join(__dirname, 'private', 'panel.html'), 'utf8');
+const PANEL_JS = fs.readFileSync(path.join(__dirname, 'private', 'panel.js'), 'utf8');
+
+// --- storage: Upstash Redis (REST) when configured, local JSON file otherwise ---
+const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || '';
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || '';
+const USE_REDIS = !!(REDIS_URL && REDIS_TOKEN);
+const DB_KEY = 'brzy:db';
+const DB_FILE = path.join(__dirname, 'data', 'db.json');
+
+async function redis(command) {
+  const r = await fetch(REDIS_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${REDIS_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(command),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.error) throw new Error(d.error || `Storage error (${r.status})`);
+  return d.result;
+}
+async function loadDb() {
+  if (USE_REDIS) {
+    const raw = await redis(['GET', DB_KEY]);
+    return raw ? { ...structuredClone(SEED), ...JSON.parse(raw) } : structuredClone(SEED);
+  }
+  if (!ON_VERCEL && fs.existsSync(DB_FILE)) return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  return structuredClone(SEED);
+}
+async function saveDb(db) {
+  if (USE_REDIS) return void (await redis(['SET', DB_KEY, JSON.stringify(db)]));
+  if (ON_VERCEL) throw new Error('Storage is not set up. In Vercel, open Storage, add Upstash Redis, connect it to this project and redeploy.');
+  fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
+  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+}
 
 // --- signed cookies ---
 const sign = (v) => crypto.createHmac('sha256', SECRET).update(v).digest('base64url');
@@ -68,6 +97,9 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   next();
 });
+
+// Express 4 does not catch rejected promises; this forwards them to the error handler.
+const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 function getSession(req) {
   return readToken(parseCookies(req).session);
@@ -121,9 +153,16 @@ app.get('/auth/callback', async (req, res) => {
     const session = { id: u.id, name: u.global_name || u.username, avatar, exp: Date.now() + 7 * 24 * 3600 * 1000 };
     setCookie(res, 'session', makeToken(session), 7 * 24 * 3600);
     if (ADMIN_IDS.includes(u.id) && avatar) {
-      const db = loadDb();
-      db.profile.avatar = avatar;
-      saveDb(db);
+      // Best effort: a storage problem must not block logging in.
+      try {
+        const db = await loadDb();
+        if (db.profile.avatar !== avatar) {
+          db.profile.avatar = avatar;
+          await saveDb(db);
+        }
+      } catch (e) {
+        console.warn('Could not save profile avatar:', e.message);
+      }
     }
     res.redirect('/');
   } catch (e) {
@@ -143,13 +182,14 @@ app.get('/api/me', (req, res) => {
 });
 
 // --- public content ---
-app.get('/api/content', (req, res) => {
-  res.json(loadDb());
-});
+app.get('/api/content', wrap(async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(await loadDb());
+}));
 
 // --- admin-only panel assets (never sent to anyone else) ---
-app.get('/admin/panel.html', requireAdmin, (req, res) => res.sendFile(path.join(__dirname, 'private', 'panel.html')));
-app.get('/admin/panel.js', requireAdmin, (req, res) => res.sendFile(path.join(__dirname, 'private', 'panel.js')));
+app.get('/admin/panel.html', requireAdmin, (req, res) => res.type('html').set('Cache-Control', 'no-store').send(PANEL_HTML));
+app.get('/admin/panel.js', requireAdmin, (req, res) => res.type('js').set('Cache-Control', 'no-store').send(PANEL_JS));
 
 // --- admin API ---
 const str = (v, max = 500) => String(v ?? '').trim().slice(0, max);
@@ -178,71 +218,73 @@ const SCHEMAS = {
     return { label: str(b.label, 60), value: str(b.value, 120), url: link };
   },
 };
+const BAD_FIELDS = 'Check the fields: a title is required and links must start with http(s).';
 
-app.post('/api/admin/clients', requireAdmin, async (req, res) => {
+app.post('/api/admin/clients', requireAdmin, wrap(async (req, res) => {
   const m = String(req.body.invite || '').trim().match(/(?:discord\.gg\/|discord(?:app)?\.com\/invite\/)?([A-Za-z0-9-]{2,32})\/?$/);
   if (!m) return res.status(400).json({ error: 'Enter a valid Discord invite link or code.' });
+  let info;
   try {
-    const info = await fetchInvite(m[1]);
-    const db = loadDb();
-    if (db.clients.some((c) => c.guildId === info.guildId)) return res.status(409).json({ error: 'That server is already in Clients.' });
-    const item = { id: crypto.randomUUID(), invite: `https://discord.gg/${m[1]}`, code: m[1], ...info, updatedAt: Date.now() };
-    db.clients.push(item);
-    saveDb(db);
-    res.json(item);
+    info = await fetchInvite(m[1]);
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: e.message });
   }
-});
+  const db = await loadDb();
+  if (db.clients.some((c) => c.guildId === info.guildId)) return res.status(409).json({ error: 'That server is already in Clients.' });
+  const item = { id: crypto.randomUUID(), invite: `https://discord.gg/${m[1]}`, code: m[1], ...info, updatedAt: Date.now() };
+  db.clients.push(item);
+  await saveDb(db);
+  res.json(item);
+}));
 
-app.post('/api/admin/clients/:id/refresh', requireAdmin, async (req, res) => {
-  const db = loadDb();
+app.post('/api/admin/clients/:id/refresh', requireAdmin, wrap(async (req, res) => {
+  const db = await loadDb();
   const c = db.clients.find((x) => x.id === req.params.id);
   if (!c) return res.status(404).json({ error: 'Not found' });
   try {
     Object.assign(c, await fetchInvite(c.code), { updatedAt: Date.now() });
-    saveDb(db);
-    res.json(c);
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: e.message });
   }
-});
+  await saveDb(db);
+  res.json(c);
+}));
 
-app.post('/api/admin/:type', requireAdmin, (req, res) => {
+app.post('/api/admin/:type', requireAdmin, wrap(async (req, res) => {
   const make = SCHEMAS[req.params.type];
   if (!make) return res.status(404).json({ error: 'Unknown section' });
   const item = make(req.body);
-  if (!item) return res.status(400).json({ error: 'Check the fields: a title is required and links must start with http(s).' });
-  const db = loadDb();
+  if (!item) return res.status(400).json({ error: BAD_FIELDS });
+  const db = await loadDb();
   const full = { id: crypto.randomUUID(), ...item };
   db[req.params.type].push(full);
-  saveDb(db);
+  await saveDb(db);
   res.json(full);
-});
+}));
 
-app.put('/api/admin/:type/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/:type/:id', requireAdmin, wrap(async (req, res) => {
   const make = SCHEMAS[req.params.type];
   if (!make) return res.status(404).json({ error: 'Unknown section' });
   const item = make(req.body);
-  if (!item) return res.status(400).json({ error: 'Check the fields: a title is required and links must start with http(s).' });
-  const db = loadDb();
+  if (!item) return res.status(400).json({ error: BAD_FIELDS });
+  const db = await loadDb();
   const i = db[req.params.type].findIndex((x) => x.id === req.params.id);
   if (i < 0) return res.status(404).json({ error: 'Not found' });
   db[req.params.type][i] = { id: req.params.id, ...item };
-  saveDb(db);
+  await saveDb(db);
   res.json(db[req.params.type][i]);
-});
+}));
 
-app.delete('/api/admin/:type/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/:type/:id', requireAdmin, wrap(async (req, res) => {
   const type = req.params.type;
-  const db = loadDb();
-  if (!Array.isArray(db[type]) || type === 'profile') return res.status(404).json({ error: 'Unknown section' });
+  const db = await loadDb();
+  if (!Array.isArray(db[type])) return res.status(404).json({ error: 'Unknown section' });
   const before = db[type].length;
   db[type] = db[type].filter((x) => x.id !== req.params.id);
   if (db[type].length === before) return res.status(404).json({ error: 'Not found' });
-  saveDb(db);
+  await saveDb(db);
   res.json({ ok: true });
-});
+}));
 
 async function fetchInvite(code) {
   const r = await fetch(`https://discord.com/api/v10/invites/${encodeURIComponent(code)}?with_counts=true`);
@@ -259,6 +301,15 @@ async function fetchInvite(code) {
   };
 }
 
+// Local only: on Vercel, public/ is served by the CDN.
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.listen(PORT, () => console.log(`brzy-portfolio running at ${BASE_URL}`));
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: err.message || 'Server error' });
+});
+
+// Vercel imports the app; locally we start a server.
+if (!ON_VERCEL) app.listen(PORT, () => console.log(`brzy-portfolio running at ${BASE_URL}`));
+
+export default app;

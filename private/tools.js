@@ -790,6 +790,7 @@
       username: 'yourname',
       name: 'Your Name',
       bio: 'A little introduction about yourself.',
+      avatar: '',
       accent: '#a78bfa',
       links: [
         { title: 'My Website', url: 'https://example.com' },
@@ -805,6 +806,7 @@
           username: String(saved.username || defaults.username).slice(0, 24),
           name: String(saved.name || defaults.name).slice(0, 40),
           bio: String(saved.bio || '').slice(0, 140),
+          avatar: typeof saved.avatar === 'string' && /^data:image\/(?:png|jpeg|webp);base64,/.test(saved.avatar) && saved.avatar.length <= 150000 ? saved.avatar : '',
           accent: /^#[0-9a-f]{6}$/i.test(saved.accent) ? saved.accent : defaults.accent,
           links: Array.isArray(saved.links) ? saved.links.slice(0, 8).map((x) => ({
             title: String(x.title || '').slice(0, 28),
@@ -852,6 +854,48 @@
     bio.value = state.bio; bio.maxLength = 140; bio.placeholder = 'Write a short bio…';
     bio.addEventListener('input', () => { state.bio = bio.value; drawPreview(); });
     editor.append(field('Short bio', bio));
+
+    const avatarSection = el('div', 'flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[.025] p-4');
+    const avatarHead = el('div', 'flex items-center gap-3');
+    const avatarPreview = el('div', 'grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/15 bg-white/10 text-xl font-bold text-white');
+    const avatarHint = el('div', 'min-w-0');
+    avatarHint.append(el('div', 'text-sm font-semibold text-white', 'Profile picture'), el('p', 'mt-1 text-xs leading-relaxed text-white/45', 'Add a square image to personalize your public page. PNG, JPG or WebP, up to 5 MB before resizing.'));
+    avatarHead.append(avatarPreview, avatarHint);
+    const avatarControls = el('div', 'flex flex-wrap items-center gap-2');
+    const avatarInput = el('input', 'sr-only');
+    avatarInput.type = 'file'; avatarInput.accept = 'image/png,image/jpeg,image/webp';
+    const avatarChoose = button('Choose picture', BTN2, () => avatarInput.click());
+    const avatarRemove = button('Remove picture', BTN2, () => { state.avatar = ''; drawPreview(); c.say('Profile picture removed.'); });
+    avatarInput.addEventListener('change', async () => {
+      const file = avatarInput.files?.[0];
+      if (!file) return;
+      if (!['image/png','image/jpeg','image/webp'].includes(file.type)) { c.say('Choose a PNG, JPG or WebP image.', true); return; }
+      if (file.size > 5 * 1024 * 1024) { c.say('Choose an image smaller than 5 MB.', true); return; }
+      try {
+        const img = await loadImageFile(file);
+        const scale = Math.min(1, 256 / Math.max(img.naturalWidth, img.naturalHeight));
+        const canvas = el('canvas'); canvas.width = Math.max(1, Math.round(img.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        const data = canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', .82);
+        if (data.length > 145000) throw new Error('That image is still too large. Try a simpler or smaller picture.');
+        state.avatar = data; drawPreview(); c.say('Profile picture added. Save your draft or publish to show it on your page.');
+      } catch (error) { c.say(error.message || 'Could not load that image.', true); }
+      avatarInput.value = '';
+    });
+    avatarControls.append(avatarChoose, avatarRemove, avatarInput);
+    avatarSection.append(avatarHead, avatarControls);
+    editor.append(avatarSection);
+    function paintAvatar(target, size = 64) {
+      target.replaceChildren();
+      target.style.width = size + 'px'; target.style.height = size + 'px';
+      target.style.borderRadius = '22px';
+      if (state.avatar) {
+        const image = el('img', 'h-full w-full object-cover');
+        image.src = state.avatar; image.alt = 'Profile picture preview'; target.append(image);
+      } else {
+        target.textContent = (state.name.trim()[0] || '?').toUpperCase();
+      }
+    }
 
     const color = el('input');
     color.type = 'color'; color.value = state.accent;
@@ -1050,7 +1094,8 @@
       glow.style.opacity = '.22';
       avatar.style.borderColor = state.accent + '88';
       avatar.style.background = state.accent + '22';
-      avatar.textContent = (state.name.trim()[0] || '?').toUpperCase();
+      paintAvatar(avatar, 80);
+      paintAvatar(avatarPreview, 64);
       displayName.textContent = state.name.trim() || 'Your Name';
       handle.textContent = '@' + (state.username || 'yourname');
       bioText.textContent = state.bio || 'Your short bio will appear here.';
@@ -1108,7 +1153,7 @@
       });
     }
     drawPreview();
-    c.say('Build your basic bio link page. Add a few links and save your draft; profile assets and publishing can come next.');
+    c.say('Build your bio link page, add a profile picture, then save or publish it.');
   }
 
   // ============================================================

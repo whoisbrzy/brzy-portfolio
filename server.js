@@ -64,12 +64,21 @@ async function redis(command) {
   return d.result;
 }
 async function loadDb() {
+  let db;
   if (USE_REDIS) {
     const raw = await redis(['GET', DB_KEY]);
-    return raw ? { ...structuredClone(SEED), ...JSON.parse(raw) } : structuredClone(SEED);
+    db = raw ? { ...structuredClone(SEED), ...JSON.parse(raw) } : structuredClone(SEED);
+  } else if (!ON_VERCEL && fs.existsSync(DB_FILE)) {
+    db = { ...structuredClone(SEED), ...JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) };
+  } else {
+    db = structuredClone(SEED);
   }
-  if (!ON_VERCEL && fs.existsSync(DB_FILE)) return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-  return structuredClone(SEED);
+  // Add newly introduced collections to databases created by older versions.
+  for (const [key, value] of Object.entries(SEED)) {
+    if (Array.isArray(value) && !Array.isArray(db[key])) db[key] = [];
+  }
+  if (!db.profile) db.profile = structuredClone(SEED.profile);
+  return db;
 }
 async function saveDb(db) {
   if (USE_REDIS) return void (await redis(['SET', DB_KEY, JSON.stringify(db)]));

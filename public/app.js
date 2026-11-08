@@ -68,11 +68,13 @@
   }
 
   // ---------- Rendering ----------
+  const HARDCODED_PROFILE_AVATAR = 'https://images-ext-1.discordapp.net/external/Ne99TtnIwQl9SFAfocaSUDKrjQxsDpFFDsnximoFNxg/%3Fsize%3D4096/https/cdn.discordapp.com/avatars/1366813770344829131/a8d97ba191094a3c8beac465ad2597ee.png?format=webp&quality=lossless';
+
   function avatar(el, profile) {
     el.replaceChildren();
-    if (profile.avatar) {
+    if (HARDCODED_PROFILE_AVATAR) {
       const img = h('img', 'h-full w-full object-cover');
-      img.src = profile.avatar;
+      img.src = HARDCODED_PROFILE_AVATAR;
       img.alt = profile.name + ' profile picture';
       el.append(img);
     } else {

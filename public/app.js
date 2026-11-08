@@ -70,6 +70,28 @@
     firstRoute = false;
   }
 
+  let isAdminUser = false;
+  let lastRefreshAt = 0;
+  function applySiteSettings(settings = {}) {
+    const maintenance = $('maintenance-screen'), banner = $('global-announcement');
+    const activeMaintenance = !!settings.maintenance && !isAdminUser;
+    maintenance.classList.toggle('hidden', !activeMaintenance);
+    $('maintenance-message').textContent = settings.maintenanceMessage || 'We are performing scheduled maintenance. Please check back soon.';
+    const notice = settings.globalMessage;
+    let dismissed = false;
+    try { dismissed = !!notice && sessionStorage.getItem('brzy-dismissed-message') === notice.id; } catch {}
+    banner.classList.toggle('hidden', !notice || dismissed || activeMaintenance);
+    if (notice && !dismissed) {
+      $('global-announcement-text').textContent = notice.text || '';
+      banner.dataset.messageId = notice.id || '';
+      banner.dataset.kind = notice.type || 'info';
+    }
+  }
+  $('global-announcement-dismiss').addEventListener('click', () => {
+    try { sessionStorage.setItem('brzy-dismissed-message', $('global-announcement').dataset.messageId || ''); } catch {}
+    $('global-announcement').classList.add('hidden');
+  });
+
   // ---------- Rendering ----------
   const HARDCODED_PROFILE_AVATAR = 'https://images-ext-1.discordapp.net/external/Ne99TtnIwQl9SFAfocaSUDKrjQxsDpFFDsnximoFNxg/%3Fsize%3D4096/https/cdn.discordapp.com/avatars/1366813770344829131/a8d97ba191094a3c8beac465ad2597ee.png?format=webp&quality=lossless';
 
@@ -335,14 +357,19 @@
       fetch('/api/me').then((r) => r.json()).catch(() => ({ user: null, isAdmin: false })),
     ]);
     if (content) db = content;
+    isAdminUser = !!me.isAdmin;
+    lastRefreshAt = Number(db.settings?.refreshAt || 0);
     renderContent();
+    applySiteSettings(db.settings || {});
 
     if (me.user) {
       $('login-btn').classList.add('hidden');
       $('signout-btn').classList.remove('hidden');
     }
+    if (!me.isAdmin && location.hash === '#/admin') location.hash = '/';
     if (me.isAdmin) {
       $('admin-btn').classList.remove('hidden');
+      if (location.hash === '#/admin') { history.replaceState(null, '', location.pathname + location.search + '#/'); }
       $('admin-btn').onclick = async () => {
         try {
           await loadPanel();
@@ -357,6 +384,19 @@
       location.reload();
     };
   }
+
+  setInterval(async () => {
+    try {
+      const r = await fetch('/api/content', { cache: 'no-store' });
+      if (!r.ok) return;
+      const latest = await r.json();
+      const refreshAt = Number(latest.settings?.refreshAt || 0);
+      if (refreshAt > lastRefreshAt) { window.location.reload(); return; }
+      lastRefreshAt = Math.max(lastRefreshAt, refreshAt);
+      db = latest;
+      applySiteSettings(db.settings || {});
+    } catch {}
+  }, 10000);
 
   window.addEventListener('hashchange', route);
   window.addEventListener('content-changed', (e) => {

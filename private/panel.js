@@ -47,9 +47,9 @@
       ],
       line: (i) => [i.name, `${i.rating} / 5 · ${i.role || "Review"}`],
     },
+    website: { label: 'Website Controls', controls: true },
   };
 
-  const overlay = document.getElementById('admin-overlay');
   const tabsEl = document.getElementById('admin-tabs');
   const formEl = document.getElementById('admin-form');
   const listEl = document.getElementById('admin-list');
@@ -98,9 +98,65 @@
     );
   }
 
+
+  function controlButton(label, action, danger = false) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = label;
+    b.className = 'rounded-full border px-4 py-2 text-sm font-semibold ' + (danger ? 'border-red-500/30 text-red-300 hover:bg-red-500/10' : 'border-white/15 text-white/75 hover:bg-white/10');
+    b.onclick = action; return b;
+  }
+
+  let siteSettings = {};
+  function addControlField(label, name, value, textarea = false) {
+    const wrap = document.createElement('label');
+    wrap.className = 'flex flex-col gap-2 text-xs text-white/60';
+    wrap.append(label);
+    const el = document.createElement(textarea ? 'textarea' : 'input');
+    if (textarea) el.rows = 3; else el.type = 'text';
+    el.name = name; el.value = value || '';
+    el.className = input; wrap.append(el); formEl.append(wrap); return el;
+  }
+
+  function renderControls() {
+    const heading = document.createElement('h3');
+    heading.className = 'text-sm font-semibold text-white'; heading.textContent = 'Maintenance mode'; formEl.append(heading);
+    const help = document.createElement('p');
+    help.className = 'text-xs leading-relaxed text-white/45';
+    help.textContent = 'Temporarily replace the public website with a maintenance screen. Admins can still access the dashboard.';
+    formEl.append(help);
+    const maintenanceMessage = addControlField('Visitor message', 'maintenanceMessage', siteSettings.maintenanceMessage || 'We are performing scheduled maintenance. Please check back soon.', true);
+    formEl.append(controlButton(siteSettings.maintenance ? 'Disable maintenance mode' : 'Enable maintenance mode', async () => {
+      try {
+        await api('POST', '/api/admin/settings', { action: 'maintenance', enabled: !siteSettings.maintenance, message: maintenanceMessage.value });
+        say(siteSettings.maintenance ? 'Maintenance mode disabled.' : 'Maintenance mode enabled.');
+        await load();
+      } catch (e) { say(e.message, true); }
+    }, !siteSettings.maintenance));
+    const divider = document.createElement('div'); divider.className = 'my-4 border-t border-white/10'; formEl.append(divider);
+    const announcement = document.createElement('h3'); announcement.className = 'text-sm font-semibold text-white'; announcement.textContent = 'Global announcement'; formEl.append(announcement);
+    const message = addControlField('Message for all visitors', 'globalMessage', '', true);
+    message.maxLength = 240;
+    const style = document.createElement('select'); style.className = input;
+    [['info','Information'],['success','Success'],['warning','Warning']].forEach(([v,l]) => { const o=document.createElement('option'); o.value=v; o.textContent=l; style.append(o); });
+    const styleLabel = document.createElement('label'); styleLabel.className='flex flex-col gap-2 text-xs text-white/60'; styleLabel.append('Message style',style); formEl.append(styleLabel);
+    formEl.append(controlButton('Publish global message', async () => {
+      try { await api('POST','/api/admin/settings',{action:'global-message',message:message.value,type:style.value}); say('Global message published.'); await load(); }
+      catch(e) { say(e.message,true); }
+    }));
+    const divider2 = document.createElement('div'); divider2.className='my-4 border-t border-white/10'; formEl.append(divider2);
+    const refreshTitle = document.createElement('h3'); refreshTitle.className='text-sm font-semibold text-white'; refreshTitle.textContent='Global refresh'; formEl.append(refreshTitle);
+    const refreshHelp = document.createElement('p'); refreshHelp.className='text-xs leading-relaxed text-white/45'; refreshHelp.textContent='Reloads every visitor’s open portfolio tab within about 10 seconds.'; formEl.append(refreshHelp);
+    formEl.append(controlButton('Refresh site globally', async () => {
+      if (!confirm('Reload the portfolio for all visitors?')) return;
+      try { await api('POST','/api/admin/settings',{action:'refresh'}); say('Global refresh signal sent.'); await load(); }
+      catch(e) { say(e.message,true); }
+    }, true));
+  }
+
   function renderForm() {
     const t = TABS[current];
     formEl.replaceChildren();
+    if (t.controls) { renderControls(); return; }
     for (const [name, label, type, required] of t.fields) {
       const wrap = document.createElement('label');
       wrap.className = 'flex flex-col gap-1 text-xs text-white/60';
@@ -139,6 +195,24 @@
 
   function renderList(items) {
     const t = TABS[current];
+    if (current === 'website') {
+      listEl.replaceChildren();
+      const rows = [
+        ['Maintenance mode', siteSettings.maintenance ? 'Enabled — visitors see the maintenance screen' : 'Disabled — website is public'],
+        ['Global message', siteSettings.globalMessage?.text || 'No active announcement'],
+        ['Last global refresh', siteSettings.refreshAt ? new Date(siteSettings.refreshAt).toLocaleString() : 'No refresh sent yet'],
+      ];
+      rows.forEach(([label,value]) => {
+        const li=document.createElement('li'); li.className='rounded-2xl border border-white/10 bg-white/[0.03] p-4';
+        const a=document.createElement('p'); a.className='text-xs uppercase tracking-wider text-white/40'; a.textContent=label;
+        const b=document.createElement('p'); b.className='mt-2 break-words text-sm text-white/80'; b.textContent=value; li.append(a,b); listEl.append(li);
+      });
+      if (siteSettings.globalMessage) listEl.append(controlButton('Clear global message', async () => {
+        try { await api('POST','/api/admin/settings',{action:'clear-message'}); say('Global message cleared.'); await load(); }
+        catch(e) { say(e.message,true); }
+      }, true));
+      return;
+    }
     if (!items.length) {
       const li = document.createElement('li');
       li.className = 'rounded-2xl border border-dashed border-white/10 p-4 text-sm text-white/40';
@@ -222,9 +296,15 @@
   }
 
   async function load() {
-    const data = await fetch('/api/content').then((r) => r.json());
+    try {
+    const response = await fetch('/api/content', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Could not load portfolio content.');
+    const data = await response.json();
+    siteSettings = data.settings || {};
     renderList(data[current] || []);
+    if (current === 'website') renderForm();
     window.dispatchEvent(new CustomEvent('content-changed', { detail: data }));
+    } catch (e) { say(e.message, true); }
   }
 
   function render() {
@@ -252,19 +332,29 @@
     }
   });
 
-  const close = () => {
-    overlay.classList.add('hidden');
-    overlay.classList.remove('flex');
-    document.body.style.overflow = '';
+  const adminMount = document.getElementById('admin-mount');
+  document.getElementById('admin-close').onclick = () => {
+    adminMount.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
   };
-  document.getElementById('admin-close').onclick = close;
-  overlay.addEventListener('click', (e) => e.target === overlay && close());
-  document.addEventListener('keydown', (e) => e.key === 'Escape' && close());
+
+  adminMount.addEventListener('click', (event) => {
+    if (event.target === adminMount) {
+      adminMount.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !adminMount.classList.contains('hidden')) {
+      adminMount.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+    }
+  });
 
   window.openAdminPanel = () => {
-    overlay.classList.remove('hidden');
-    overlay.classList.add('flex');
-    document.body.style.overflow = 'hidden';
+    adminMount.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
     render();
   };
 })();

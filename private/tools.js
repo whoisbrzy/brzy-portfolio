@@ -933,7 +933,10 @@
   }
 
   function clothingShowcaser(body, c) {
-    const state = { shirt: null, pants: null, skin: '#e9b98a', title: 'My clothing' };
+    const state = { shirt: null, pants: null, skin: '#e9b98a', bg: 'midnight', title: 'My clothing', angle: 18 };
+    let favicon = null, tex = null, drag = null;
+    loadFavicon().then((f) => { favicon = f; draw(); });
+
     const root = el('div', 'grid gap-5 lg:grid-cols-[18rem_1fr]');
     body.append(root);
     const side = el('div', 'flex flex-col gap-4');
@@ -944,9 +947,11 @@
         if (!i.files[0]) return;
         try {
           const img = await loadImageFile(i.files[0]);
-          state[key] = img;
-          draw();
-          c.say(label + ' loaded. Original proportions preserved.');
+          if (img.naturalWidth !== 585 || img.naturalHeight !== 559) {
+            c.say('This template is ' + img.naturalWidth + ' × ' + img.naturalHeight + '. Classic Roblox clothing templates should be 585 × 559.', true);
+          }
+          state[key] = img; rebuild(); draw();
+          c.say(label + ' applied to the 3D avatar preview.');
         } catch (e) { c.say(e.message, true); }
       });
       return field(label, i);
@@ -954,75 +959,134 @@
     const title = el('input', INPUT); title.value = state.title; title.maxLength = 40;
     title.addEventListener('input', () => { state.title = title.value; draw(); });
     const skin = el('input'); skin.type = 'color'; skin.value = state.skin;
-    skin.addEventListener('input', () => { state.skin = skin.value; draw(); });
-    const dl = button('Download showcase', BTN, () => exportOne());
+    skin.addEventListener('input', () => { state.skin = skin.value; rebuild(); draw(); });
+    const bgSel = el('select', INPUT);
+    [['midnight', 'Midnight'], ['aurora', 'Aurora'], ['studio', 'Studio light']].forEach(([v, t]) => { const o = el('option', '', t); o.value = v; bgSel.append(o); });
+    bgSel.addEventListener('change', () => { state.bg = bgSel.value; draw(); });
+    const rotate = el('input'); rotate.type = 'range'; rotate.min = 0; rotate.max = 360; rotate.value = state.angle;
+    rotate.addEventListener('input', () => { state.angle = Number(rotate.value); draw(); });
+    const dlOne = button('Download 3D showcase', BTN, () => exportOne());
+    const dlSheet = button('Download 3-view showcase', BTN2, () => exportSheet());
     side.append(
       pick('Shirt template', 'shirt'),
       pick('Pants template (optional)', 'pants'),
       field('Name on showcase', title),
-      field('Skin / transparent area color', skin),
-      dl,
-      el('p', 'text-xs leading-relaxed text-white/45', 'Classic Roblox shirts and pants use a 585 × 559 template. The preview keeps that exact aspect ratio and shows the original flat layout without stretching or rearranging it.')
+      field('Skin color', skin),
+      field('Background', bgSel),
+      field('Rotate avatar', rotate),
+      dlOne, dlSheet,
+      el('p', 'text-xs leading-relaxed text-white/45', 'Upload your classic 585 × 559 shirt and/or pants template. It is mapped onto a blocky Roblox-style 3D avatar automatically. Drag the preview or use the slider to inspect the outfit.')
     );
 
     const view = el('div', 'flex min-w-0 flex-col items-center gap-3');
-    const canvas = el('canvas', 'block h-auto w-full max-w-full rounded-2xl border border-white/10');
-    canvas.width = 1200; canvas.height = 1147;
-    canvas.style.aspectRatio = '585 / 559';
-    canvas.setAttribute('aria-label', 'Original flat Roblox clothing template shown at its correct aspect ratio.');
+    const canvas = el('canvas', 'max-h-[70vh] max-w-full cursor-grab touch-none rounded-3xl border border-white/10');
+    canvas.width = 900; canvas.height = 1000;
+    canvas.setAttribute('aria-label', 'Interactive 3D Roblox clothing avatar preview. Drag to rotate.');
     view.append(canvas);
     root.append(side, view);
 
-    function drawImageFit(g, img, x, y, maxW, maxH) {
-      const ratio = Math.min(maxW / img.width, maxH / img.height);
-      const w = img.width * ratio, h = img.height * ratio;
-      const left = x + (maxW - w) / 2, top = y + (maxH - h) / 2;
-      g.fillStyle = state.skin;
-      g.fillRect(left, top, w, h);
-      g.drawImage(img, left, top, w, h);
-      g.strokeStyle = 'rgba(255,255,255,.75)';
-      g.lineWidth = 2;
-      g.strokeRect(left, top, w, h);
+    function makeFace() {
+      const f = el('canvas'); f.width = f.height = 128;
+      const x = f.getContext('2d');
+      x.fillStyle = state.skin; x.fillRect(0, 0, 128, 128);
+      x.fillStyle = '#1a1a1a';
+      x.beginPath(); x.ellipse(44, 54, 7, 11, 0, 0, Math.PI * 2); x.ellipse(84, 54, 7, 11, 0, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = '#1a1a1a'; x.lineWidth = 6; x.lineCap = 'round';
+      x.beginPath(); x.arc(64, 74, 26, 0.25 * Math.PI, 0.75 * Math.PI); x.stroke();
+      return f;
     }
-    function paint(g, W, H) {
-      g.fillStyle = '#050505'; g.fillRect(0, 0, W, H);
-      const both = !!(state.shirt && state.pants);
-      const titleY = 26;
-      g.fillStyle = '#fff'; g.font = '600 30px sans-serif';
-      g.textAlign = 'left'; g.textBaseline = 'top';
-      if (state.title.trim()) g.fillText(state.title.trim(), 32, titleY);
-      if (both) {
-        const boxW = 550, boxH = 526, y = 88;
-        g.font = '600 22px sans-serif'; g.textAlign = 'center';
-        g.fillText('SHIRT', 310, 56); g.fillText('PANTS', 890, 56);
-        drawImageFit(g, state.shirt, 35, y, boxW, boxH);
-        drawImageFit(g, state.pants, 615, y, boxW, boxH);
-      } else {
-        const img = state.shirt || state.pants;
-        if (img) drawImageFit(g, img, 28, 82, W - 56, H - 110);
-        else {
-          g.fillStyle = 'rgba(255,255,255,.45)'; g.font = '24px sans-serif';
-          g.textAlign = 'center'; g.textBaseline = 'middle';
-          g.fillText('Upload a Roblox shirt or pants template to preview it', W / 2, H / 2);
-        }
-      }
+    function compose(parts) {
+      const t = el('canvas'); t.width = TEMPLATE_W * 2; t.height = TEMPLATE_H * 2;
+      const x = t.getContext('2d');
+      x.fillStyle = state.skin; x.fillRect(0, 0, t.width, t.height);
+      parts.forEach((im) => im && x.drawImage(im, 0, 0, t.width, t.height));
+      return t;
+    }
+    function rebuild() {
+      const skinTile = el('canvas'); skinTile.width = skinTile.height = 16;
+      const sx = skinTile.getContext('2d'); sx.fillStyle = state.skin; sx.fillRect(0, 0, 16, 16);
+      tex = {
+        torso: compose([state.pants, state.shirt]),
+        arms: compose([state.shirt]),
+        legs: compose([state.pants]),
+        face: makeFace(),
+        skinTile,
+      };
     }
     function draw() {
-      const both = !!(state.shirt && state.pants);
-      canvas.width = 1200;
-      canvas.height = both ? 650 : 1147;
-      canvas.style.aspectRatio = both ? '1200 / 650' : '585 / 559';
-      paint(canvas.getContext('2d'), canvas.width, canvas.height);
+      if (!tex) return;
+      const g = canvas.getContext('2d');
+      renderScene(g, canvas.width, canvas.height, {
+        bg: state.bg,
+        tex,
+        figures: [{ angle: state.angle, cx: canvas.width / 2, cy: canvas.height * 0.47, scale: 118 }],
+      });
+      drawWatermark(g, canvas.width, canvas.height, favicon, 0.8, state.bg === 'studio');
+      if (state.title.trim()) {
+        g.fillStyle = state.bg === 'studio' ? '#111' : '#fff';
+        g.font = '700 30px sans-serif'; g.textAlign = 'left'; g.textBaseline = 'top';
+        g.fillText(state.title.trim(), 34, 28);
+      }
+    }
+    canvas.addEventListener('pointerdown', (e) => {
+      drag = { x: e.clientX, angle: state.angle };
+      canvas.setPointerCapture(e.pointerId);
+      canvas.classList.replace('cursor-grab', 'cursor-grabbing');
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      state.angle = (drag.angle + (e.clientX - drag.x) * 0.8 + 360) % 360;
+      rotate.value = Math.round(state.angle);
+      draw();
+    });
+    const endDrag = () => { drag = null; canvas.classList.replace('cursor-grabbing', 'cursor-grab'); };
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') state.angle = (state.angle - 10 + 360) % 360;
+      if (e.key === 'ArrowRight') state.angle = (state.angle + 10) % 360;
+      rotate.value = Math.round(state.angle); draw();
+    });
+    canvas.tabIndex = 0;
+    function drawExport(g, W, H, angle) {
+      renderScene(g, W, H, { bg: state.bg, tex, figures: [{ angle, cx: W / 2, cy: H * 0.47, scale: Math.min(W * 0.14, H * 0.14) }] });
+      if (state.title.trim()) {
+        g.fillStyle = state.bg === 'studio' ? '#111' : '#fff';
+        g.font = '700 48px sans-serif'; g.textAlign = 'left'; g.textBaseline = 'top';
+        g.fillText(state.title.trim(), 48, 36);
+      }
+      drawWatermark(g, W, H, favicon, 1.2, state.bg === 'studio');
     }
     async function exportOne() {
-      const both = !!(state.shirt && state.pants);
-      const cv = el('canvas'); cv.width = 2400; cv.height = both ? 1300 : 2294;
-      paint(cv.getContext('2d'), cv.width, cv.height);
-      download(await canvasBlob(cv), 'roblox-clothing-showcase.png');
-      c.say('Downloaded the correctly proportioned flat clothing showcase.');
+      const cv = el('canvas'); cv.width = 1800; cv.height = 2000;
+      drawExport(cv.getContext('2d'), cv.width, cv.height, state.angle);
+      download(await canvasBlob(cv), 'roblox-3d-clothing-showcase.png');
+      c.say('Downloaded the 3D clothing showcase.');
     }
+    async function exportSheet() {
+      const W = 2400, H = 1100, cv = el('canvas'); cv.width = W; cv.height = H;
+      const g = cv.getContext('2d');
+      drawBackground(g, W, H, state.bg);
+      const angles = [0, 90, 180];
+      const labels = ['FRONT', 'SIDE', 'BACK'];
+      angles.forEach((angle, i) => {
+        const x = W * (0.17 + i * 0.33);
+        renderScene(g, W, H, { bg: state.bg, tex, figures: [{ angle, cx: x, cy: H * 0.53, scale: 118 }] });
+        g.fillStyle = state.bg === 'studio' ? '#111' : '#fff';
+        g.font = '600 28px sans-serif'; g.textAlign = 'center';
+        g.fillText(labels[i], x, 72);
+      });
+      if (state.title.trim()) {
+        g.fillStyle = state.bg === 'studio' ? '#111' : '#fff';
+        g.font = '700 40px sans-serif'; g.textAlign = 'left'; g.fillText(state.title.trim(), 48, 28);
+      }
+      drawWatermark(g, W, H, favicon, 1.1, state.bg === 'studio');
+      download(await canvasBlob(cv), 'roblox-3-view-clothing-showcase.png');
+      c.say('Downloaded the front, side and back showcase.');
+    }
+    rebuild();
     draw();
-    c.say('Upload a classic Roblox shirt or pants template to preview it at the correct proportions.');
+    c.say('Upload a shirt or pants template to see it on the 3D avatar instantly.');
   }
 
   // ============================================================

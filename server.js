@@ -29,6 +29,10 @@ if (!process.env.SESSION_SECRET) console.warn('SESSION_SECRET not set: logins wi
 const SEED = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'seed.json'), 'utf8'));
 const PANEL_HTML = fs.readFileSync(path.join(__dirname, 'private', 'panel.html'), 'utf8');
 const PANEL_JS = fs.readFileSync(path.join(__dirname, 'private', 'panel.js'), 'utf8');
+const TOOLS_HTML = fs.readFileSync(path.join(__dirname, 'private', 'tools.html'), 'utf8');
+const TOOLS_JS = fs.readFileSync(path.join(__dirname, 'private', 'tools.js'), 'utf8');
+// The site's favicon address, read from index.html so there is one source of truth.
+const FAVICON_HREF = (fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8').match(/<link[^>]+rel="icon"[^>]*href="([^"]+)"/i)?.[1] || '').replace(/&amp;/g, '&');
 
 // --- storage: Upstash Redis (REST) when configured, local JSON file otherwise ---
 // Vercel integrations may prefix Redis variables with the database name
@@ -142,6 +146,13 @@ function getSession(req) {
   return readToken(parseCookies(req).session);
 }
 const isAdmin = (s) => !!s && ADMIN_IDS.includes(s.id);
+// Any signed-in Discord user (not just admins).
+function requireUser(req, res, next) {
+  const s = getSession(req);
+  if (!s) return res.status(401).json({ error: 'Sign in with Discord to use Tools.' });
+  req.session = s;
+  next();
+}
 function requireAdmin(req, res, next) {
   const s = getSession(req);
   if (!isAdmin(s)) return res.status(403).json({ error: 'Not authorized' });
@@ -321,6 +332,23 @@ app.get('/api/me', (req, res) => {
 app.get('/api/content', wrap(async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json(await loadDb());
+}));
+
+// --- Tools: only sent to signed-in Discord users ---
+app.get('/tools/tools.html', requireUser, (req, res) => res.type('html').set('Cache-Control', 'no-store').send(TOOLS_HTML));
+app.get('/tools/tools.js', requireUser, (req, res) => res.type('js').set('Cache-Control', 'no-store').send(TOOLS_JS));
+
+// Same-origin copy of the site favicon so tools can draw it onto exported images (canvas needs CORS-safe images).
+let faviconCache = null;
+app.get('/favicon-image', wrap(async (req, res) => {
+  if (!FAVICON_HREF) return res.status(404).end();
+  if (!/^https?:\/\//i.test(FAVICON_HREF)) return res.redirect(FAVICON_HREF);
+  if (!faviconCache) {
+    const r = await fetch(FAVICON_HREF);
+    if (!r.ok) return res.status(502).end();
+    faviconCache = { type: r.headers.get('content-type') || 'image/png', data: Buffer.from(await r.arrayBuffer()) };
+  }
+  res.type(faviconCache.type).set('Cache-Control', 'public, max-age=86400').send(faviconCache.data);
 }));
 
 // --- admin-only panel assets (never sent to anyone else) ---

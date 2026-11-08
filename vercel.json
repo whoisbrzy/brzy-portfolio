@@ -3,7 +3,7 @@
   "outputDirectory": "public",
   "functions": {
     "api/index.js": {
-      "includeFiles": "{server.js,private/**,data/seed.json}"
+      "includeFiles": "{server.js,private/**,data/seed.json,public/index.html}"
     }
   },
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }]

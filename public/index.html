@@ -83,6 +83,9 @@
           <a href="#/reviews" data-route="reviews" class="nav-link flex items-center gap-2 rounded-full px-3 py-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white">Reviews</a>
         </li>
         <li>
+          <a href="#/tools" data-route="tools" class="nav-link flex items-center gap-2 rounded-full px-3 py-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white">Tools</a>
+        </li>
+        <li>
           <a href="#/contact" data-route="contact" class="nav-link flex items-center gap-2 rounded-full px-3 py-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             Contact
@@ -198,6 +201,19 @@
     </section>
 
     <!-- Contact -->
+    <!-- Tools (sign in with Discord to use) -->
+    <section data-view="tools" class="view" aria-labelledby="tools-title">
+      <div class="mx-auto flex h-full max-w-6xl flex-col px-6 pt-36 pb-6 md:pt-28">
+        <h2 id="tools-title" tabindex="-1" class="text-3xl font-bold tracking-tight sm:text-4xl">Tools</h2>
+        <p class="mt-2 max-w-lg text-white/55">Free tools for creators. Sign in with Discord to use them.</p>
+        <div id="tools-locked" class="mt-8 flex max-w-md flex-col items-start gap-4 rounded-3xl border border-white/10 bg-black/40 p-6 backdrop-blur">
+          <p class="text-sm leading-relaxed text-white/65">Tools are for signed-in members. Connect your Discord account to unlock the background remover, font finder, color picker, image splitter, icon search and clothing showcaser.</p>
+          <a id="tools-login" href="/auth/discord" class="rounded-full bg-white px-5 py-2.5 font-compact text-sm font-semibold text-black transition-transform hover:scale-[1.03]">Login with Discord</a>
+        </div>
+        <div id="tools-mount" class="no-bar mt-6 hidden min-h-0 flex-1 overflow-y-auto"></div>
+      </div>
+    </section>
+
     <section data-view="contact" class="view flex items-center justify-center px-6 pt-36 pb-12 md:pt-28" aria-labelledby="ct-title">
       <div class="mx-auto flex max-w-2xl flex-col items-center text-center">
         <h2 id="ct-title" tabindex="-1" class="text-3xl font-bold tracking-tight sm:text-5xl">Contact</h2>

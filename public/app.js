@@ -34,11 +34,12 @@
     '/past-work': 'past-work',
     '/projects': 'projects',
     '/contact': 'contact',
+    '/tools': 'tools',
     '/reviews': 'reviews',
     '/privacy': 'privacy',
     '/terms': 'terms',
   };
-  const TITLES = { home: '', 'past-work': 'Past Work', projects: 'Projects', contact: 'Contact', reviews: 'Reviews', privacy: 'Privacy Policy', terms: 'Terms of Service' };
+  const TITLES = { home: '', 'past-work': 'Past Work', projects: 'Projects', contact: 'Contact', reviews: 'Reviews', tools: 'Tools', privacy: 'Privacy Policy', terms: 'Terms of Service' };
   let db = { profile: { name: 'brzy', tagline: '', avatar: '' }, pastwork: [], projects: [], contacts: [], clients: [], reviews: [] };
   let firstRoute = true;
 
@@ -272,6 +273,31 @@
     panelLoaded = true;
   }
 
+  // ---------- Tools (markup and code are only sent to signed-in users) ----------
+  let toolsLoaded = false;
+  async function loadTools() {
+    if (toolsLoaded) return;
+    try {
+      const html = await fetch('/tools/tools.html').then((r) => (r.ok ? r.text() : Promise.reject()));
+      $('tools-mount').innerHTML = html; // trusted: served by our server to signed-in users only
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = '/tools/tools.js';
+        s.onload = res;
+        s.onerror = rej;
+        document.body.append(s);
+      });
+      $('tools-locked').classList.add('hidden');
+      $('tools-mount').classList.remove('hidden');
+      toolsLoaded = true;
+    } catch {
+      /* stays locked; the sign-in card is still shown */
+    }
+  }
+  $('tools-login').addEventListener('click', () => {
+    try { sessionStorage.setItem('returnTo', '#/tools'); } catch {}
+  });
+
   // ---------- BRZYX command menu ----------
   const commandOverlay = $('command-overlay');
   const commandSearch = $('command-search');
@@ -281,6 +307,7 @@
     { label: 'Past Work', detail: 'Browse completed client work', route: '/past-work', keywords: 'portfolio clients work' },
     { label: 'Projects', detail: 'Explore personal projects', route: '/projects', keywords: 'builds development' },
     { label: 'Reviews', detail: 'Read client feedback', route: '/reviews', keywords: 'testimonials feedback' },
+    { label: 'Tools', detail: 'Background remover, color picker and more', route: '/tools', keywords: 'background remover font finder color picker split image icons roblox clothing' },
     { label: 'Contact', detail: 'Get in touch', route: '/contact', keywords: 'message commission hire' },
     { label: 'Privacy Policy', detail: 'View privacy information', route: '/privacy', keywords: 'legal data' },
     { label: 'Terms of Service', detail: 'View website terms', route: '/terms', keywords: 'legal rules' },
@@ -365,6 +392,11 @@
     if (me.user) {
       $('login-btn').classList.add('hidden');
       $('signout-btn').classList.remove('hidden');
+      loadTools();
+      try {
+        const back = sessionStorage.getItem('returnTo');
+        if (back) { sessionStorage.removeItem('returnTo'); location.hash = back; }
+      } catch {}
     }
     if (!me.isAdmin && location.hash === '#/admin') location.hash = '/';
     if (me.isAdmin) {

@@ -30,6 +30,17 @@ Sign in with Discord. If your user ID is in `ADMIN_IDS`, an **Admin** button app
 
 Tabs: Past Work, Projects, Contacts, Clients. For Clients, paste a Discord invite; the server fetches the server name, icon and member count. Use Refresh to update the count. Clients show at the bottom of the home page.
 
+## Tools page
+
+`#/tools` is for signed-in Discord users (any account, not just admins). The tools' code is only served by `/tools/tools.js` and `/tools/tools.html` to a valid session, so signed-out visitors get a 401, not just a hidden button. Everything runs in the browser, so images are never uploaded.
+
+- **Background Remover:** automatic AI mode (loads `@imgly/background-removal` from jsDelivr on first use) with a solid-color fallback.
+- **Font Finder:** previews about 50 Google Fonts with your own text. It cannot identify a font from an image.
+- **Color Picker:** magnifier, HEX/RGB/HSL, dominant palette.
+- **Split Images:** grid presets, PNG or JPG, per-tile or zip download.
+- **Icons:** search and download from Iconify's open icon sets.
+- **Roblox Clothing Showcaser:** rotating character wearing the classic 585 x 559 shirt and pants templates. Exports carry the site favicon, which is fetched through `/favicon-image` so the canvas can export it.
+
 ## Notes
 
 - Fonts: SF Pro and SF Compact only. Apple's licence means the files aren't in the repo: add your copies to `public/fonts` (see `public/fonts/README.md`).

@@ -92,62 +92,76 @@
     }
   </style>
 
-  <!-- Explicit mobile navigation styles (kept outside Tailwind processing). -->
+  <!-- Mobile island: animate the container and reveal its contents without display:none. -->
   <style>
     @media (max-width: 767px) {
       header { padding-left: 0 !important; padding-right: 0 !important; }
       #notch {
         display: flex !important;
-        width: max-content !important;
-        max-width: calc(100vw - 28px) !important;
-        min-width: 0 !important;
+        box-sizing: border-box !important;
+        width: 116px !important;
+        min-width: 116px !important;
+        max-width: calc(100vw - 24px) !important;
         margin: max(8px, env(safe-area-inset-top)) auto 0 !important;
         padding: 5px 9px !important;
+        flex-direction: column !important;
         flex-wrap: nowrap !important;
-        flex-direction: row !important;
         align-items: center !important;
-        justify-content: center !important;
+        justify-content: flex-start !important;
         gap: 0 !important;
+        overflow: hidden !important;
         border: 1px solid rgba(255,255,255,.14) !important;
         border-radius: 999px !important;
         background: rgba(8,8,9,.96) !important;
         box-shadow: 0 10px 34px rgba(0,0,0,.5) !important;
         backdrop-filter: blur(24px);
         -webkit-backdrop-filter: blur(24px);
-        transition: width .32s ease, border-radius .32s ease, padding .32s ease !important;
+        transition: width .42s cubic-bezier(.22,1,.36,1),
+                    min-width .42s cubic-bezier(.22,1,.36,1),
+                    border-radius .38s ease,
+                    padding .38s ease,
+                    gap .38s ease,
+                    box-shadow .38s ease !important;
       }
-      #mobile-island-toggle { display: flex !important; }
-      #notch > a[data-route="home"],
+      #mobile-island-toggle {
+        display: flex !important;
+        flex: 0 0 auto !important;
+        min-height: 28px !important;
+        white-space: nowrap !important;
+      }
+      #notch > a[data-route="home"] { display: none !important; }
       #notch > ul,
-      #notch > div { display: none !important; }
-      #notch.mobile-open {
-        display: flex !important;
-        width: min(420px, calc(100vw - 24px)) !important;
-        max-width: calc(100vw - 24px) !important;
-        padding: 12px 14px 14px !important;
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 12px !important;
-        border-radius: 28px !important;
-      }
-      #notch.mobile-open #mobile-island-toggle {
-        display: flex !important;
-        align-self: center !important;
-      }
-      #notch.mobile-open #mobile-island-chevron { transform: rotate(180deg); }
-      #notch.mobile-open > ul {
+      #notch > div {
         display: flex !important;
         position: static !important;
         order: 0 !important;
         width: 100% !important;
+        max-height: 0 !important;
+        flex: 0 0 auto !important;
+        overflow: hidden !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        transform: translateY(-7px) !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        margin: 0 !important;
+        border-color: transparent !important;
+        transition: max-height .38s cubic-bezier(.22,1,.36,1),
+                    opacity .22s ease,
+                    transform .38s cubic-bezier(.22,1,.36,1),
+                    padding .38s ease,
+                    margin .38s ease,
+                    border-color .25s ease,
+                    visibility 0s linear .38s !important;
+      }
+      #notch > ul {
         flex-direction: column !important;
         align-items: stretch !important;
         gap: 4px !important;
-        padding-top: 8px !important;
-        border-top: 1px solid rgba(255,255,255,.09) !important;
-        transform: none !important;
+        transform: translateY(-7px) !important;
       }
-      #notch.mobile-open > ul a {
+      #notch > ul a {
         display: flex !important;
         width: 100% !important;
         justify-content: flex-start !important;
@@ -155,21 +169,52 @@
         border-radius: 13px !important;
         font-size: 14px !important;
       }
-      #notch.mobile-open > div {
-        display: flex !important;
-        width: 100% !important;
+      #notch > div {
         justify-content: stretch !important;
-        padding-top: 10px !important;
-        border-top: 1px solid rgba(255,255,255,.09) !important;
+        gap: 8px !important;
       }
-      #notch.mobile-open > div button,
-      #notch.mobile-open > div a {
+      #notch > div button,
+      #notch > div a {
         display: flex !important;
-        flex: 1 !important;
+        flex: 1 1 0 !important;
         justify-content: center !important;
         min-height: 40px !important;
       }
+      #notch.mobile-open {
+        width: min(390px, calc(100vw - 24px)) !important;
+        min-width: min(390px, calc(100vw - 24px)) !important;
+        padding: 10px 14px 14px !important;
+        gap: 9px !important;
+        border-radius: 28px !important;
+      }
+      #notch.mobile-open #mobile-island-toggle { align-self: center !important; }
+      #notch.mobile-open #mobile-island-chevron { transform: rotate(180deg); }
+      #notch.mobile-open > ul {
+        max-height: 260px !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        transform: translateY(0) !important;
+        padding-top: 8px !important;
+        border-top: 1px solid rgba(255,255,255,.09) !important;
+        transition-delay: 0s !important;
+      }
+      #notch.mobile-open > div {
+        max-height: 64px !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        transform: translateY(0) !important;
+        padding-top: 10px !important;
+        border-top: 1px solid rgba(255,255,255,.09) !important;
+        transition-delay: 0s !important;
+      }
       #global-announcement { top: calc(68px + env(safe-area-inset-top)) !important; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      @media (max-width: 767px) {
+        #notch, #notch > ul, #notch > div, #mobile-island-chevron { transition: none !important; }
+      }
     }
   </style>
 \n</head>

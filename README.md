@@ -16,13 +16,13 @@ Portfolio with a notch navbar, a ColorBends WebGL background, separate click-thr
    | `ADMIN_IDS` | your Discord user ID (comma-separate more than one) |
    | `SESSION_SECRET` | a long random string |
 
-4. Discord developer portal, OAuth2 -> Redirects: add `https://brzyx.vercel.app/auth/callback`. The only scope used is `identify`.
+4. Discord developer portal, OAuth2 -> Redirects: add `https://brzyx.vercel.app/auth/discord`. The only scope used is `identify`.
 5. Redeploy.
 
 ## Run locally
 
 1. `npm install`
-2. Copy `.env.example` to `.env`, fill it in, and add `http://localhost:3000/auth/callback` as a second Discord redirect.
+2. Copy `.env.example` to `.env`, fill it in, and add `http://localhost:3000/auth/discord` as a second Discord redirect.
 3. `npm start`, then open http://localhost:3000. Without Redis variables, edits are saved to `data/db.json`.
 
 ## Admin panel
@@ -33,6 +33,6 @@ Tabs: Past Work, Projects, Contacts, Clients. For Clients, paste a Discord invit
 
 ## Notes
 
-- Font: SF Pro only, loaded from the visitor's device (SF Pro is licensed for Apple platforms and can't be redistributed in a repo).
+- Fonts: SF Pro and SF Compact only. Apple's licence means the files aren't in the repo: add your copies to `public/fonts` (see `public/fonts/README.md`).
 - Background: `public/colorbends.js` runs the original ColorBends fragment shader on plain WebGL (no three.js), with the same props.
 - Past Work and Projects page through their items (3, 2 or 1 per page depending on screen width) instead of scrolling.

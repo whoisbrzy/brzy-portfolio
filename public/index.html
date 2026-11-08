@@ -12,7 +12,8 @@
       theme: {
         extend: {
           fontFamily: {
-            sf: ['SF Pro Display', 'SF Pro Text', 'SF Pro', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+            sf: ['SF Pro', '-apple-system', 'sans-serif'],
+            compact: ['SF Compact', 'SF Pro', 'sans-serif'],
           },
         },
       },
@@ -20,9 +21,9 @@
   </script>
   <style type="text/tailwindcss">
     @layer base {
-      /* SF Pro only. Uses the copy installed on the visitor's device (Apple devices ship it). */
-      @font-face { font-family: 'SF Pro'; src: local('SF Pro Text'), local('SFProText-Regular'), local('.SF NS'), local('-apple-system'); font-weight: 400 500; }
-      @font-face { font-family: 'SF Pro'; src: local('SF Pro Display'), local('SFProDisplay-Bold'), local('.SF NS'), local('-apple-system'); font-weight: 600 800; }
+      /* SF Pro and SF Compact only. Put your licensed font files in public/fonts (see public/fonts/README.md). */
+      @font-face { font-family: 'SF Pro'; font-weight: 100 900; font-display: swap; src: url('/fonts/SF-Pro.woff2') format('woff2'), url('/fonts/SF-Pro.ttf') format('truetype'), url('/fonts/SF-Pro.otf') format('opentype'); }
+      @font-face { font-family: 'SF Compact'; font-weight: 100 900; font-display: swap; src: url('/fonts/SF-Compact.woff2') format('woff2'), url('/fonts/SF-Compact.ttf') format('truetype'), url('/fonts/SF-Compact.otf') format('opentype'); }
       html, body { height: 100%; overflow: hidden; background: #000; color-scheme: dark; }
       body { @apply font-sf text-white antialiased; letter-spacing: -0.01em; }
       :focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
@@ -54,7 +55,7 @@
         <span class="text-sm font-bold" id="notch-name">brzy</span>
       </a>
 
-      <ul class="order-3 flex w-full items-center justify-center gap-1 text-sm font-medium md:order-none md:w-auto">
+      <ul class="order-3 flex w-full items-center justify-center gap-1 font-compact text-sm font-medium md:order-none md:w-auto">
         <li>
           <a href="#/past-work" data-route="past-work" class="nav-link flex items-center gap-2 rounded-full px-3 py-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
@@ -76,9 +77,9 @@
       </ul>
 
       <div class="flex items-center gap-2">
-        <button id="admin-btn" type="button" class="hidden rounded-full border border-white/15 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-white/10">Admin</button>
-        <button id="signout-btn" type="button" class="hidden px-2 py-1.5 text-sm font-semibold text-white/60 hover:text-white">Sign out</button>
-        <a id="login-btn" href="/auth/discord" class="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition-transform hover:scale-[1.03]">
+        <button id="admin-btn" type="button" class="hidden rounded-full border border-white/15 px-3.5 py-1.5 font-compact text-sm font-semibold text-white hover:bg-white/10">Admin</button>
+        <button id="signout-btn" type="button" class="hidden px-2 py-1.5 font-compact text-sm font-semibold text-white/60 hover:text-white">Sign out</button>
+        <a id="login-btn" href="/auth/discord" class="flex items-center gap-2 rounded-full bg-white px-4 py-2 font-compact text-sm font-semibold text-black transition-transform hover:scale-[1.03]">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>
           <span>Login with Discord</span>
         </a>
@@ -94,12 +95,12 @@
         <h1 id="home-title" tabindex="-1" class="text-5xl font-bold tracking-tight sm:text-7xl"><span id="hero-name">brzy's</span> <span class="text-white/55">Portfolio</span></h1>
         <p id="hero-tagline" class="mt-6 max-w-xl text-base leading-relaxed text-white/60 sm:text-lg"></p>
         <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
-          <a href="#/past-work" class="flex items-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-[1.03]">
+          <a href="#/past-work" class="flex items-center gap-2 rounded-2xl bg-white px-6 py-3 font-compact text-sm font-semibold text-black transition-transform hover:scale-[1.03]">
             Past Work
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </a>
-          <a href="#/projects" class="rounded-2xl border border-white/15 bg-black/40 px-6 py-3 text-sm font-semibold backdrop-blur transition-colors hover:bg-white/10">Projects</a>
-          <a href="#/contact" class="rounded-2xl border border-white/15 bg-black/40 px-6 py-3 text-sm font-semibold backdrop-blur transition-colors hover:bg-white/10">Contact</a>
+          <a href="#/projects" class="rounded-2xl border border-white/15 bg-black/40 px-6 py-3 font-compact text-sm font-semibold backdrop-blur transition-colors hover:bg-white/10">Projects</a>
+          <a href="#/contact" class="rounded-2xl border border-white/15 bg-black/40 px-6 py-3 font-compact text-sm font-semibold backdrop-blur transition-colors hover:bg-white/10">Contact</a>
         </div>
       </div>
       <ul id="clients-strip" class="absolute inset-x-0 bottom-6 mx-auto hidden max-w-3xl flex-wrap items-center justify-center gap-3 px-6"></ul>

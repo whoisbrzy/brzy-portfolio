@@ -101,7 +101,7 @@
     if (item.description) body.append(h('p', 'line-clamp-3 text-sm leading-relaxed text-white/55', item.description));
     if (kind === 'projects' && item.tags && item.tags.length) {
       const tags = h('ul', 'mt-auto flex flex-wrap gap-1.5 pt-2');
-      item.tags.forEach((t) => tags.append(h('li', 'rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-white/60', t)));
+      item.tags.forEach((t) => tags.append(h('li', 'font-compact rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-white/60', t)));
       body.append(tags);
     }
     root.append(media, body);
@@ -128,7 +128,7 @@
     pager.replaceChildren();
     if (pages < 2) return;
     const btn = (label, dir, disabled) => {
-      const b = h('button', 'rounded-full border border-white/15 bg-black/40 px-4 py-2 text-sm font-semibold backdrop-blur transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-black/40', label);
+      const b = h('button', 'rounded-full border border-white/15 bg-black/40 px-4 py-2 font-compact text-sm font-semibold backdrop-blur transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-black/40', label);
       b.type = 'button';
       b.disabled = disabled;
       b.onclick = () => {
@@ -137,7 +137,7 @@
       };
       return b;
     };
-    const status = h('span', 'min-w-16 text-center text-sm text-white/50', `${i + 1} of ${pages}`);
+    const status = h('span', 'font-compact min-w-16 text-center text-sm text-white/50', `${i + 1} of ${pages}`);
     status.setAttribute('aria-live', 'polite');
     pager.append(btn('Previous', -1, i === 0), status, btn('Next', 1, i === pages - 1));
   }
@@ -175,7 +175,7 @@
           icon.append(img);
         } else icon.textContent = (c.name || '?').charAt(0);
         const text = h('div', 'min-w-0 text-left');
-        text.append(h('p', 'max-w-[9rem] truncate text-sm font-semibold leading-tight', c.name), h('p', 'text-xs text-white/50', Number(c.members).toLocaleString() + ' members'));
+        text.append(h('p', 'max-w-[9rem] truncate font-compact text-sm font-semibold leading-tight', c.name), h('p', 'font-compact text-xs text-white/50', Number(c.members).toLocaleString() + ' members'));
         a.append(icon, text);
         li.append(a);
         return li;
@@ -187,7 +187,7 @@
         ? db.contacts.map((c) => {
             const li = h('li');
             const link = safeUrl(c.url);
-            const el = h(link ? 'a' : 'span', 'flex items-center gap-2 rounded-2xl border border-white/15 bg-black/40 px-5 py-3 text-sm font-semibold backdrop-blur transition-colors ' + (link ? 'hover:bg-white/10' : ''));
+            const el = h(link ? 'a' : 'span', 'flex items-center gap-2 rounded-2xl border border-white/15 bg-black/40 px-5 py-3 font-compact text-sm font-semibold backdrop-blur transition-colors ' + (link ? 'hover:bg-white/10' : ''));
             if (link) {
               el.href = link;
               if (/^https?:/i.test(link)) {

@@ -20,7 +20,7 @@ const PORT = Number(process.env.PORT || 3000);
 const BASE_URL = (process.env.BASE_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : `http://localhost:${PORT}`)).replace(/\/$/, '');
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
-const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${BASE_URL}/auth/callback`;
+const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${BASE_URL}/auth/discord`;
 const ADMIN_IDS = (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
 const SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const SECURE = BASE_URL.startsWith('https://');
@@ -113,7 +113,7 @@ function requireAdmin(req, res, next) {
 }
 
 // --- Discord login ---
-app.get('/auth/discord', (req, res) => {
+function startLogin(req, res) {
   if (!CLIENT_ID || !CLIENT_SECRET) return res.status(500).send('Discord login is not configured. Set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.');
   const state = crypto.randomBytes(16).toString('hex');
   setCookie(res, 'oauth_state', makeToken({ state, exp: Date.now() + 10 * 60 * 1000 }), 600);
@@ -124,12 +124,11 @@ app.get('/auth/discord', (req, res) => {
     redirect_uri: REDIRECT_URI,
     scope: 'identify',
     state,
-    prompt: 'none',
   }).toString();
   res.redirect(url.toString());
-});
+}
 
-app.get('/auth/callback', async (req, res) => {
+async function handleCallback(req, res) {
   try {
     const saved = readToken(parseCookies(req).oauth_state);
     if (!saved || !req.query.state || saved.state !== req.query.state || !req.query.code) return res.redirect('/?login=failed');
@@ -169,7 +168,10 @@ app.get('/auth/callback', async (req, res) => {
     console.error(e);
     res.redirect('/?login=failed');
   }
-});
+}
+
+// Discord sends people back to this same URL with ?code=..., so one route does both jobs.
+app.get('/auth/discord', (req, res) => (req.query.code || req.query.error ? handleCallback(req, res) : startLogin(req, res)));
 
 app.post('/auth/logout', (req, res) => {
   setCookie(res, 'session', '', 0);

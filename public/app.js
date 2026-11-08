@@ -345,6 +345,7 @@
       $('login-btn').classList.add('hidden');
       $('signout-btn').classList.remove('hidden');
     }
+    if (!me.isAdmin && location.hash === '#/admin') location.hash = '/';
     if (me.isAdmin) {
       $('admin-btn').classList.remove('hidden');
       if (location.hash === '#/admin') { try { await loadPanel(); window.openAdminPanel(); } catch { location.hash = '/'; } }

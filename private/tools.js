@@ -896,10 +896,15 @@
     });
     const reset = button('Reset draft', BTN2, () => {
       state = { ...defaults, links: defaults.links.map((x) => ({ ...x })) };
-      editor.querySelectorAll('input').forEach((n) => { if (n.type !== 'color') n.value = ''; });
-      // Rebuild the small editor controls so all inputs reflect the defaults.
-      c.say('Draft reset. Refresh the preview to see the starter layout.');
-      location.reload();
+      const fields = editor.querySelectorAll('input');
+      if (fields[0]) fields[0].value = state.name;
+      if (fields[1]) fields[1].value = state.username;
+      if (fields[2]) fields[2].value = state.accent;
+      bio.value = state.bio;
+      try { localStorage.removeItem(STORAGE_KEY); } catch {}
+      drawEditorLinks();
+      drawPreview();
+      c.say('Draft reset to the starter profile.');
     });
     actions.append(save, reset);
     editor.append(actions);

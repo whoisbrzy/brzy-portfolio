@@ -36,6 +36,16 @@
       fields: [['invite', 'Discord invite link or code', 'text', true]],
       line: (i) => [i.name, `${Number(i.members).toLocaleString()} members`],
     },
+    reviews: {
+      label: 'Reviews',
+      fields: [
+        ['name', 'Client name', 'text', true],
+        ['role', 'Role / community', 'text'],
+        ['rating', 'Rating (1–5)', 'text', true],
+        ['quote', 'Review', 'textarea', true],
+      ],
+      line: (i) => [i.name, `${i.rating} / 5 · ${i.role || "Review"}`],
+    },
   };
 
   const overlay = document.getElementById('admin-overlay');

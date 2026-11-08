@@ -934,21 +934,19 @@
 
   function clothingShowcaser(body, c) {
     const state = { shirt: null, pants: null, skin: '#e9b98a', title: 'My clothing' };
-    let favicon = null;
-    loadFavicon().then((f) => { favicon = f; draw(); });
-
     const root = el('div', 'grid gap-5 lg:grid-cols-[18rem_1fr]');
     body.append(root);
     const side = el('div', 'flex flex-col gap-4');
     const pick = (label, key) => {
       const i = el('input', 'text-xs text-white/60 file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-black');
-      i.type = 'file'; i.accept = 'image/png,image/*';
+      i.type = 'file'; i.accept = 'image/png,image/jpeg,image/webp';
       i.addEventListener('change', async () => {
         if (!i.files[0]) return;
         try {
-          state[key] = await loadImageFile(i.files[0]);
+          const img = await loadImageFile(i.files[0]);
+          state[key] = img;
           draw();
-          c.say(label + ' applied to the flat template.');
+          c.say(label + ' loaded. Original proportions preserved.');
         } catch (e) { c.say(e.message, true); }
       });
       return field(label, i);
@@ -957,86 +955,74 @@
     title.addEventListener('input', () => { state.title = title.value; draw(); });
     const skin = el('input'); skin.type = 'color'; skin.value = state.skin;
     skin.addEventListener('input', () => { state.skin = skin.value; draw(); });
-    const dlOne = button('Download flat template', BTN, () => exportOne());
-    const hint = el('p', 'text-xs leading-relaxed text-white/45',
-      'Upload a classic 585 × 559 Roblox shirt or pants template. It is displayed as a flat, unfolded 2D clothing layout — front and back panels in the middle, arms on the sides. No avatar, 3D model or rotation.');
-    side.append(pick('Shirt template', 'shirt'), pick('Pants template (optional)', 'pants'),
-      field('Name on showcase', title), field('Skin color', skin), dlOne, hint);
+    const dl = button('Download showcase', BTN, () => exportOne());
+    side.append(
+      pick('Shirt template', 'shirt'),
+      pick('Pants template (optional)', 'pants'),
+      field('Name on showcase', title),
+      field('Skin / transparent area color', skin),
+      dl,
+      el('p', 'text-xs leading-relaxed text-white/45', 'Classic Roblox shirts and pants use a 585 × 559 template. The preview keeps that exact aspect ratio and shows the original flat layout without stretching or rearranging it.')
+    );
 
     const view = el('div', 'flex min-w-0 flex-col items-center gap-3');
-    const canvas = el('canvas', 'max-w-full rounded-2xl border border-white/10');
-    canvas.width = 1500; canvas.height = 620;
-    canvas.style.width = '100%';
-    canvas.setAttribute('aria-label', 'Flat unfolded Roblox clothing template with front and back panels.');
+    const canvas = el('canvas', 'block h-auto w-full max-w-full rounded-2xl border border-white/10');
+    canvas.width = 1200; canvas.height = 1220;
+    canvas.style.aspectRatio = '585 / 559';
+    canvas.setAttribute('aria-label', 'Original flat Roblox clothing template shown at its correct aspect ratio.');
     view.append(canvas);
     root.append(side, view);
 
-    function background(g, W, H) {
-      g.fillStyle = '#050505';
-      g.fillRect(0, 0, W, H);
-    }
-    function panel(g, img, uv, face, x, y, w, h) {
+    function drawImageFit(g, img, x, y, maxW, maxH) {
+      const ratio = Math.min(maxW / img.width, maxH / img.height);
+      const w = img.width * ratio, h = img.height * ratio;
+      const left = x + (maxW - w) / 2, top = y + (maxH - h) / 2;
       g.fillStyle = state.skin;
-      g.fillRect(x, y, w, h);
-      if (img) {
-        const r = UV[uv][face];
-        const sx = img.width / TEMPLATE_W, sy = img.height / TEMPLATE_H;
-        g.drawImage(img, r[0] * sx, r[1] * sy, r[2] * sx, r[3] * sy, x, y, w, h);
-      }
-      g.strokeStyle = '#f4f4f4';
-      g.lineWidth = 5;
-      g.strokeRect(x, y, w, h);
+      g.fillRect(left, top, w, h);
+      g.drawImage(img, left, top, w, h);
+      g.strokeStyle = 'rgba(255,255,255,.75)';
+      g.lineWidth = 2;
+      g.strokeRect(left, top, w, h);
     }
-    function drawLayout(g, W, H) {
-      background(g, W, H);
-      g.save(); g.scale(W / 1500, H / 620);
-      const shirtTex = state.shirt ? compose([state.shirt]) : null;
-      const pantsTex = state.pants ? compose([state.pants]) : null;
-
-      panel(g, shirtTex, 'rlimb', 'front', 48, 48, 136, 520);
-      panel(g, shirtTex, 'llimb', 'front', 1316, 48, 136, 520);
-      panel(g, shirtTex, 'torso', 'front', 206, 48, 518, 262);
-      panel(g, shirtTex, 'torso', 'back', 776, 48, 518, 262);
-      panel(g, pantsTex || shirtTex, 'torso', 'bottom', 336, 310, 260, 254);
-      panel(g, pantsTex || shirtTex, 'torso', 'top', 906, 310, 260, 254);
-
-      if (favicon) {
-        g.save(); g.globalAlpha = 0.95;
-        g.drawImage(favicon, 708, 326, 84, 84);
-        g.restore();
+    function paint(g, W, H) {
+      g.fillStyle = '#050505'; g.fillRect(0, 0, W, H);
+      const both = !!(state.shirt && state.pants);
+      const titleY = 26;
+      g.fillStyle = '#fff'; g.font = '600 30px sans-serif';
+      g.textAlign = 'left'; g.textBaseline = 'top';
+      if (state.title.trim()) g.fillText(state.title.trim(), 32, titleY);
+      if (both) {
+        const boxW = 550, boxH = 526, y = 88;
+        g.font = '600 22px sans-serif'; g.textAlign = 'center';
+        g.fillText('SHIRT', 310, 56); g.fillText('PANTS', 890, 56);
+        drawImageFit(g, state.shirt, 35, y, boxW, boxH);
+        drawImageFit(g, state.pants, 615, y, boxW, boxH);
+      } else {
+        const img = state.shirt || state.pants;
+        if (img) drawImageFit(g, img, 28, 82, W - 56, H - 110);
+        else {
+          g.fillStyle = 'rgba(255,255,255,.45)'; g.font = '24px sans-serif';
+          g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.fillText('Upload a Roblox shirt or pants template to preview it', W / 2, H / 2);
+        }
       }
-      g.restore();
-    }
-    function compose(parts) {
-      const t = el('canvas'); t.width = TEMPLATE_W * 2; t.height = TEMPLATE_H * 2;
-      const x = t.getContext('2d');
-      x.fillStyle = state.skin; x.fillRect(0, 0, t.width, t.height);
-      parts.forEach((im) => im && x.drawImage(im, 0, 0, t.width, t.height));
-      return t;
     }
     function draw() {
-      const g = canvas.getContext('2d');
-      drawLayout(g, canvas.width, canvas.height);
-      if (state.title.trim()) {
-        g.fillStyle = '#fff';
-        g.font = '600 22px "SF Pro", -apple-system, sans-serif';
-        g.textAlign = 'left'; g.textBaseline = 'top';
-        g.fillText(state.title.trim(), 28, 14);
-      }
+      const both = !!(state.shirt && state.pants);
+      canvas.width = 1200;
+      canvas.height = both ? 650 : 1250;
+      canvas.style.aspectRatio = both ? '1200 / 650' : '585 / 610';
+      paint(canvas.getContext('2d'), canvas.width, canvas.height);
     }
     async function exportOne() {
-      const cv = el('canvas'); cv.width = 3000; cv.height = 1240;
-      drawLayout(cv.getContext('2d'), cv.width, cv.height);
-      const g = cv.getContext('2d');
-      if (state.title.trim()) {
-        g.fillStyle = '#fff'; g.font = '600 44px "SF Pro", -apple-system, sans-serif';
-        g.textAlign = 'left'; g.textBaseline = 'top'; g.fillText(state.title.trim(), 56, 28);
-      }
-      download(await canvasBlob(cv), 'flat-roblox-clothing-template.png');
-      c.say('Downloaded the flat unfolded clothing template.');
+      const both = !!(state.shirt && state.pants);
+      const cv = el('canvas'); cv.width = 2400; cv.height = both ? 1300 : 2500;
+      paint(cv.getContext('2d'), cv.width, cv.height);
+      download(await canvasBlob(cv), 'roblox-clothing-showcase.png');
+      c.say('Downloaded the correctly proportioned flat clothing showcase.');
     }
     draw();
-    c.say('Upload a shirt or pants template to preview it in the flat unfolded layout.');
+    c.say('Upload a classic Roblox shirt or pants template to preview it at the correct proportions.');
   }
 
   // ============================================================

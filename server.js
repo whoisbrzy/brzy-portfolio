@@ -147,6 +147,103 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// --- Spotify connection and playback --- 
+const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
+const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
+const SPOTIFY_REDIRECT_OVERRIDE = process.env.SPOTIFY_REDIRECT_URI || '';
+const spotifyRedirectUri = (req) => SPOTIFY_REDIRECT_OVERRIDE || `${origin(req)}/auth/spotify`;
+
+app.get('/auth/spotify', async (req, res) => {
+  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) return res.status(503).send('Spotify is not configured yet. Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Vercel.');
+  if (req.query.code) {
+    const saved = readToken(parseCookies(req).spotify_oauth_state);
+    if (!saved || saved.state !== req.query.state) return res.redirect('/?spotify=failed');
+    try {
+      const basic = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
+      const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ grant_type: 'authorization_code', code: String(req.query.code), redirect_uri: spotifyRedirectUri(req) }),
+      });
+      const tokens = await tokenRes.json();
+      if (!tokenRes.ok || !tokens.refresh_token) return res.redirect('/?spotify=failed');
+      const payload = { refreshToken: tokens.refresh_token, accessToken: tokens.access_token, accessExp: Date.now() + (tokens.expires_in || 3600) * 1000 - 60000, exp: Date.now() + 30 * 24 * 3600 * 1000 };
+      setCookie(req, res, 'spotify_session', makeToken(payload), 30 * 24 * 3600);
+      setCookie(req, res, 'spotify_oauth_state', '', 0);
+      return res.redirect('/');
+    } catch (e) {
+      console.error('Spotify OAuth failed:', e.message);
+      return res.redirect('/?spotify=failed');
+    }
+  }
+  if (req.query.error) return res.redirect('/');
+  const state = crypto.randomBytes(16).toString('hex');
+  setCookie(req, res, 'spotify_oauth_state', makeToken({ state, exp: Date.now() + 10 * 60 * 1000 }), 600);
+  const url = new URL('https://accounts.spotify.com/authorize');
+  url.search = new URLSearchParams({
+    client_id: SPOTIFY_CLIENT_ID,
+    response_type: 'code',
+    redirect_uri: spotifyRedirectUri(req),
+    scope: 'user-read-currently-playing user-read-playback-state playlist-read-private',
+    state,
+  }).toString();
+  res.redirect(url.toString());
+});
+
+async function spotifyAccess(req, res) {
+  const session = readToken(parseCookies(req).spotify_session);
+  if (!session?.refreshToken) return null;
+  if (session.accessToken && session.accessExp > Date.now()) return session.accessToken;
+  const basic = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
+  const r = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: session.refreshToken }),
+  });
+  const data = await r.json();
+  if (!r.ok || !data.access_token) return null;
+  session.accessToken = data.access_token;
+  session.accessExp = Date.now() + (data.expires_in || 3600) * 1000 - 60000;
+  if (data.refresh_token) session.refreshToken = data.refresh_token;
+  setCookie(req, res, 'spotify_session', makeToken(session), Math.max(60, Math.floor((session.exp - Date.now()) / 1000)));
+  return session.accessToken;
+}
+
+app.get('/api/spotify/status', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ connected: !!readToken(parseCookies(req).spotify_session)?.refreshToken, configured: !!(SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET) });
+});
+app.get('/api/spotify/playlists', wrap(async (req, res) => {
+  const token = await spotifyAccess(req, res);
+  if (!token) return res.status(401).json({ error: 'Connect Spotify first.' });
+  const r = await fetch('https://api.spotify.com/v1/me/playlists?limit=50', { headers: { Authorization: `Bearer ${token}` } });
+  const data = await r.json();
+  if (!r.ok) return res.status(r.status).json({ error: 'Could not load Spotify playlists.' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ items: (data.items || []).map((p) => ({ id: p.id, name: p.name, uri: p.uri, image: p.images?.[0]?.url || '' })) });
+}));
+app.get('/api/spotify/now-playing', wrap(async (req, res) => {
+  const token = await spotifyAccess(req, res);
+  if (!token) return res.status(401).json({ playing: false });
+  const r = await fetch('https://api.spotify.com/v1/me/player/currently-playing', { headers: { Authorization: `Bearer ${token}` } });
+  if (r.status === 204) return res.json({ playing: false });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok || !data.item) return res.json({ playing: false });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    playing: !!data.is_playing,
+    contextUri: data.context?.uri || '',
+    track: data.item.name || '',
+    artist: (data.item.artists || []).map((a) => a.name).join(', '),
+    image: data.item.album?.images?.[0]?.url || '',
+    url: data.item.external_urls?.spotify || '',
+  });
+}));
+app.post('/api/spotify/disconnect', (req, res) => {
+  setCookie(req, res, 'spotify_session', '', 0);
+  res.json({ ok: true });
+});
+
 // --- Discord login ---
 function startLogin(req, res) {
   if (!CLIENT_ID || !CLIENT_SECRET) return res.status(500).send('Discord login is not configured. Set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.');

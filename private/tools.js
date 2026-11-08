@@ -1530,10 +1530,104 @@
     draw();
     c.say('Upload classic Roblox shirt and pants templates, then switch between the 3D avatar and flat 2D views.');
   }
+
+  // ============================================================
+  // Gradient Maker
+  // ============================================================
+  function gradientMaker(body, c) {
+    const state = { type: 'linear', angle: 135, colors: ['#7c3aed', '#06b6d4'] };
+    const root = el('div', 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]');
+    body.append(root);
+
+    const main = el('div', 'flex min-w-0 flex-col gap-4');
+    const preview = el('div', 'relative min-h-[280px] overflow-hidden rounded-2xl border border-white/10 sm:min-h-[380px]');
+    preview.setAttribute('aria-label', 'Live gradient preview');
+    const previewLabel = el('span', 'absolute bottom-4 left-4 rounded-full border border-white/20 bg-black/30 px-3 py-1.5 text-xs text-white/80 backdrop-blur', 'LIVE PREVIEW');
+    preview.append(previewLabel);
+    main.append(preview);
+
+    const presets = el('div', 'flex flex-wrap gap-2');
+    const presetValues = [
+      ['Violet / Cyan', '#7c3aed', '#06b6d4'],
+      ['Sunset', '#f97316', '#ec4899'],
+      ['Ocean', '#0f766e', '#38bdf8'],
+      ['Mono', '#111827', '#9ca3af'],
+      ['Rose', '#be123c', '#fda4af'],
+      ['Lime', '#365314', '#bef264']
+    ];
+    presetValues.forEach(([name, a, b]) => {
+      const p = button(name, BTN2 + ' !px-3 !py-1.5 !text-xs', () => {
+        state.colors = [a, b];
+        colorA.value = a; colorB.value = b; draw();
+      });
+      presets.append(p);
+    });
+    main.append(presets);
+
+    const side = el('div', 'flex flex-col gap-4');
+    const type = el('select', INPUT);
+    [['linear', 'Linear'], ['radial', 'Radial']].forEach(([v, label]) => {
+      const o = el('option', '', label); o.value = v; type.append(o);
+    });
+    type.addEventListener('change', () => { state.type = type.value; angleWrap.classList.toggle('hidden', state.type !== 'linear'); draw(); });
+
+    const angle = el('input'); angle.type = 'range'; angle.min = '0'; angle.max = '360'; angle.value = String(state.angle);
+    const angleValue = el('span', 'text-xs text-white/50 tabular-nums', '135°');
+    const angleWrap = field('Angle', angle);
+    angleWrap.append(angleValue);
+    angle.addEventListener('input', () => { state.angle = Number(angle.value); angleValue.textContent = state.angle + '°'; draw(); });
+
+    const colorA = el('input'); colorA.type = 'color'; colorA.value = state.colors[0];
+    const colorB = el('input'); colorB.type = 'color'; colorB.value = state.colors[1];
+    colorA.className = 'h-10 w-full cursor-pointer rounded-xl border border-white/10 bg-white/5 p-1';
+    colorB.className = colorA.className;
+    colorA.addEventListener('input', () => { state.colors[0] = colorA.value; draw(); });
+    colorB.addEventListener('input', () => { state.colors[1] = colorB.value; draw(); });
+    const colorGrid = el('div', 'grid grid-cols-2 gap-3');
+    colorGrid.append(field('Start color', colorA), field('End color', colorB));
+
+    const css = el('textarea', INPUT + ' min-h-24 resize-y font-mono text-xs leading-relaxed');
+    css.readOnly = true;
+    css.addEventListener('focus', () => css.select());
+    const copyCss = button('Copy CSS', BTN, async () => c.say((await copy(css.value)) ? 'CSS copied to clipboard.' : 'Could not copy CSS.'));
+    const downloadPng = button('Download PNG', BTN2, () => {
+      const cv = el('canvas'); cv.width = 1600; cv.height = 900;
+      const g = cv.getContext('2d');
+      if (state.type === 'linear') {
+        const rad = state.angle * Math.PI / 180;
+        const dx = Math.cos(rad) * cv.width / 2, dy = Math.sin(rad) * cv.height / 2;
+        const gr = g.createLinearGradient(cv.width/2-dx, cv.height/2-dy, cv.width/2+dx, cv.height/2+dy);
+        gr.addColorStop(0, state.colors[0]); gr.addColorStop(1, state.colors[1]); g.fillStyle = gr;
+      } else {
+        const gr = g.createRadialGradient(800, 450, 0, 800, 450, 900);
+        gr.addColorStop(0, state.colors[0]); gr.addColorStop(1, state.colors[1]); g.fillStyle = gr;
+      }
+      g.fillRect(0, 0, cv.width, cv.height);
+      canvasBlob(cv).then((blob) => download(blob, 'brzyx-gradient.png')).then(() => c.say('PNG exported at 1600 × 900.'));
+    });
+    side.append(field('Gradient type', type), angleWrap, colorGrid,
+      el('p', 'text-xs font-semibold text-white/50', 'CSS output'), css,
+      el('div', 'flex flex-wrap gap-2', ''), copyCss, downloadPng);
+    root.append(main, side);
+
+    function draw() {
+      const value = state.type === 'linear'
+        ? `linear-gradient(${state.angle}deg, ${state.colors[0]}, ${state.colors[1]})`
+        : `radial-gradient(circle, ${state.colors[0]}, ${state.colors[1]})`;
+      preview.style.background = value;
+      css.value = `background: ${value};`;
+    }
+    draw();
+    c.say('Create a gradient, copy its CSS, or export a 1600 × 900 PNG.');
+  }
+
   // ============================================================
   // Registry + grid
   // ============================================================
   const TOOLS = [
+    { id: 'gradient', name: 'Gradient Maker', blurb: 'Create linear and radial gradients, copy CSS or export a PNG.', mount: gradientMaker,
+      icon: '<defs><linearGradient id="gm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><rect x="3" y="3" width="18" height="18" rx="4" fill="url(#gm)" stroke="currentColor"/>' },
+
     { id: 'bg', name: 'Background Remover', blurb: 'Cut the background out of any image and download a transparent PNG.', mount: backgroundRemover,
       icon: '<path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/><circle cx="12" cy="10" r="3"/><path d="M6.5 19a6 6 0 0 1 11 0"/>' },
     { id: 'font', name: 'Font Finder', blurb: 'Preview fonts with your own text, then copy the name or CSS.', mount: fontFinder,

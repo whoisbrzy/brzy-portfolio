@@ -12,17 +12,17 @@
 
   // Background (same settings as the reference)
   ColorBends($('bg'), {
-    colors: ['#ff5c7a', '#8a5cff', '#00ffd1'],
+    colors: ['#34304d', '#283c43', '#171b24'],
     rotation: 90,
-    speed: 0.2,
+    speed: 0.08,
     scale: 1,
     frequency: 1,
     warpStrength: 1,
-    mouseInfluence: 1,
-    noise: 0.15,
+    mouseInfluence: 0.25,
+    noise: 0.08,
     parallax: 0.5,
     iterations: 1,
-    intensity: 1.5,
+    intensity: 0.55,
     bandWidth: 6,
     transparent: true,
   });
@@ -110,7 +110,7 @@
 
   function card(item, kind) {
     const link = safeUrl(item.link);
-    const root = h(link ? 'a' : 'article', 'group flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur transition-colors hover:bg-white/[0.07]');
+    const root = h(link ? 'a' : 'article', 'group flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025] transition-colors duration-300 hover:border-white/15 hover:bg-white/[0.045]');
     if (link) {
       root.href = link;
       root.target = '_blank';
@@ -118,7 +118,7 @@
     }
     const media = h('div', 'aspect-[16/9] w-full overflow-hidden bg-white/5');
     if (item.image) {
-      const img = h('img', 'h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]');
+      const img = h('img', 'h-full w-full object-cover transition-opacity duration-300 group-hover:opacity-90');
       img.src = item.image;
       img.alt = item.title;
       img.loading = 'lazy';
@@ -137,7 +137,7 @@
   }
 
   function empty(text) {
-    return h('p', 'col-span-full rounded-3xl border border-dashed border-white/10 p-8 text-center text-sm text-white/40', text);
+    return h('p', 'col-span-full rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-white/40', text);
   }
 
   // Pages instead of scrolling: 3 cards on wide screens, 2 on medium, 1 on phones.
@@ -214,7 +214,7 @@
     const reviews = db.reviews || [];
     reviewsGrid.replaceChildren(
       ...(reviews.length ? reviews.map((review) => {
-        const article = h('article', 'rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur');
+        const article = h('article', 'rounded-2xl border border-white/[0.08] bg-white/[0.025] p-6');
         const stars = h('p', 'mb-4 tracking-[0.2em] text-sm text-white/80', '★'.repeat(Math.max(1, Math.min(5, Number(review.rating) || 5))) + '☆'.repeat(5 - Math.max(1, Math.min(5, Number(review.rating) || 5))));
         const quote = h('blockquote', 'text-base leading-relaxed text-white/75', '“' + review.quote + '”');
         const byline = h('div', 'mt-6 flex items-center gap-3 border-t border-white/10 pt-4');

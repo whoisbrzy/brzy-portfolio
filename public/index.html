@@ -40,19 +40,8 @@
       .client-logo { display: grid; width: 3.5rem; height: 3.5rem; flex: 0 0 auto; place-items: center; opacity: .58; filter: grayscale(1); transition: opacity .2s ease, filter .2s ease; }
       .client-logo:hover { opacity: 1; filter: grayscale(0); }
       .client-logo img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 1rem; }
-      /* A standalone top-center Dynamic Island: compact when idle, wider while playing. */
-      #spotify-island { position: fixed; top: 0; left: 50%; z-index: 60; display: flex; width: 150px; height: 38px; transform: translateX(-50%); overflow: hidden; align-items: center; justify-content: center; gap: 9px; padding: 0 12px; border: 1px solid rgba(255,255,255,.12); border-top: 0; border-radius: 0 0 22px 22px; background: #020202; box-shadow: 0 10px 30px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.08); transition: width .5s cubic-bezier(.2,.9,.2,1.15), height .35s ease, border-radius .35s ease, box-shadow .35s ease; }
-      #spotify-island::before { content: ""; position: absolute; top: 5px; left: 50%; width: 34px; height: 3px; transform: translateX(-50%); border-radius: 99px; background: rgba(255,255,255,.1); pointer-events: none; }
-      #spotify-island.active { width: min(360px, calc(100vw - 32px)); height: 68px; border-radius: 0 0 26px 26px; box-shadow: 0 16px 42px rgba(0,0,0,.75), 0 0 20px rgba(30,215,96,.08), inset 0 1px 0 rgba(255,255,255,.1); }
-      #spotify-island:not(.active) .spotify-wave { margin: 7px auto 0; }
-      #spotify-island .island-details { opacity: 0; transform: translateY(5px); transition: opacity .2s ease .1s, transform .3s ease .08s; }
-      #spotify-island.active .island-details { opacity: 1; transform: translateY(0); }
-      #spotify-island .island-art { width: 0; height: 0; opacity: 0; transition: all .3s ease; }
-      #spotify-island.active .island-art { width: 38px; height: 38px; opacity: 1; }
-      #notch { position: relative; border: 1px solid rgba(255,255,255,.12); border-radius: 999px; background: rgba(3,3,3,.92); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); transition: border-color .35s ease, box-shadow .35s ease; }
-      #notch.spotify-playing { border-color: rgba(30,215,96,.22); box-shadow: 0 18px 55px -12px rgba(0,0,0,.95), 0 0 24px rgba(30,215,96,.06); }
-      @media (max-width: 767px) { #spotify-island.active { width: min(300px, calc(100vw - 32px)); } }
-      @media (prefers-reduced-motion: reduce) { #spotify-island, #spotify-island * { transition: none !important; animation: none !important; } }
+      /* Top-attached navigation notch */
+      #notch { position: relative; border: 1px solid rgba(255,255,255,.12); border-top: 0; border-radius: 0 0 30px 30px; background: rgba(3,3,3,.96); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); box-shadow: 0 18px 50px -12px rgba(0,0,0,.9); }
       @media (prefers-reduced-motion: reduce) {
         .view, .view.active, .veil { transition: none; }
       }
@@ -65,21 +54,9 @@
   <div id="veil-home" class="veil pointer-events-none fixed inset-0 bg-gradient-to-b from-black/80 via-black/55 to-black" aria-hidden="true"></div>
   <div id="veil-page" class="veil pointer-events-none fixed inset-0 bg-black/80 opacity-0" aria-hidden="true"></div>
 
-  <!-- Spotify Dynamic Island notch -->
-  <div id="spotify-island" aria-live="polite" aria-label="Spotify playback">
-    <div class="spotify-wave flex h-6 w-5 shrink-0 items-center justify-center gap-0.5" aria-hidden="true"><span></span><span></span><span></span></div>
-    <img id="spotify-art" class="island-art shrink-0 rounded-lg object-cover" alt="" />
-    <div class="island-details min-w-0 flex-1 text-center">
-      <p id="spotify-track" class="truncate text-xs font-semibold text-white"></p>
-      <p id="spotify-artist" class="truncate text-[10px] text-white/50"></p>
-      <select id="spotify-playlist" class="mt-0.5 hidden max-w-full bg-transparent text-center text-[9px] text-white/45 outline-none" aria-label="Choose Spotify playlist"><option value="">All Spotify playback</option></select>
-    </div>
-    <button id="spotify-island-close" type="button" class="island-details rounded-full px-1.5 py-1 text-xs text-white/45 hover:text-white" aria-label="Hide player">×</button>
-  </div>
-
-  <!-- Notch -->
-  <header class="fixed inset-x-0 top-12 z-50 flex justify-center px-3">
-    <nav id="notch" aria-label="Main" class="relative flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[28px] border border-white/10 bg-black/90 px-4 py-3 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.9)] md:px-6">
+  <!-- Top navigation notch -->
+  <header class="fixed inset-x-0 top-0 z-50 flex justify-center px-3">
+    <nav id="notch" aria-label="Main" class="relative flex w-fit max-w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 md:px-6">
       <a href="#/" data-route="home" class="flex items-center gap-2.5 rounded-full" aria-label="brzy, home">
         <span id="notch-avatar" class="grid h-8 w-8 place-items-center overflow-hidden rounded-full bg-white/10 text-sm font-bold"></span>
         <span class="text-sm font-bold" id="notch-name">brzy</span>
@@ -110,7 +87,6 @@
       </ul>
 
       <div class="flex min-w-0 items-center justify-end gap-2">
-        <button id="spotify-connect" type="button" class="rounded-full border border-white/15 px-3 py-1.5 font-compact text-xs font-semibold text-white/75 transition-colors hover:bg-white/10">Connect Spotify</button>
         <button id="admin-btn" type="button" class="hidden rounded-full border border-white/15 px-3.5 py-1.5 font-compact text-sm font-semibold text-white hover:bg-white/10">Admin</button>
         <button id="signout-btn" type="button" class="hidden px-2 py-1.5 font-compact text-sm font-semibold text-white/60 hover:text-white">Sign out</button>
         <a id="login-btn" href="/auth/discord" class="flex items-center gap-2 rounded-full bg-white px-4 py-2 font-compact text-sm font-semibold text-black transition-transform hover:scale-[1.03]">

@@ -46,6 +46,46 @@
       #command-overlay.hidden { display: none; }
       #command-dialog { width: min(560px, 100%); overflow: hidden; border: 1px solid rgba(255,255,255,.14); border-radius: 22px; background: rgba(12,12,14,.97); box-shadow: 0 30px 100px rgba(0,0,0,.7); }
       .command-item[aria-selected="true"] { background: rgba(255,255,255,.12); color: white; }
+
+      #mobile-island-toggle { display: none; }
+      @media (max-width: 767px) {
+        header { padding-left: 0 !important; padding-right: 0 !important; }
+        #notch {
+          width: max-content; max-width: calc(100vw - 28px); min-width: 0;
+          margin-top: max(8px, env(safe-area-inset-top));
+          padding: 5px 9px; gap: 0; flex-wrap: nowrap; justify-content: center;
+          border: 1px solid rgba(255,255,255,.12); border-radius: 999px;
+          background: rgba(8,8,9,.94); box-shadow: 0 10px 34px rgba(0,0,0,.45);
+          transition: width .32s cubic-bezier(.2,.8,.2,1), border-radius .32s ease, padding .32s ease, background .32s ease;
+        }
+        #mobile-island-toggle { display: flex; }
+        #notch > a[data-route="home"], #notch > ul, #notch > div { display: none !important; }
+        #notch.mobile-open {
+          width: min(420px, calc(100vw - 24px)); max-width: calc(100vw - 24px);
+          border-radius: 28px; padding: 12px 14px 14px;
+          flex-direction: column; align-items: stretch; gap: 12px;
+        }
+        #notch.mobile-open #mobile-island-toggle { align-self: center; }
+        #notch.mobile-open #mobile-island-chevron { transform: rotate(180deg); }
+        #notch.mobile-open > ul {
+          display: flex !important; order: 0; position: static; width: 100%;
+          transform: none; flex-direction: column; align-items: stretch; gap: 4px;
+          padding-top: 8px; border-top: 1px solid rgba(255,255,255,.09);
+        }
+        #notch.mobile-open > ul a {
+          display: flex; width: 100%; justify-content: flex-start;
+          padding: 11px 12px; border-radius: 13px; font-size: 14px;
+        }
+        #notch.mobile-open > div {
+          display: flex !important; width: 100%; justify-content: stretch;
+          padding-top: 10px; border-top: 1px solid rgba(255,255,255,.09);
+        }
+        #notch.mobile-open > div button, #notch.mobile-open > div a {
+          justify-content: center; flex: 1; min-height: 40px;
+        }
+        #notch.mobile-open > div #login-btn { display: flex !important; }
+        #global-announcement { top: calc(68px + env(safe-area-inset-top)); }
+      }
       @media (prefers-reduced-motion: reduce) {
         .view, .view.active, .veil { transition: none; transform: none; }
       }
@@ -61,6 +101,11 @@
   <!-- Top navigation notch -->
   <header class="fixed inset-x-0 top-0 z-50 flex justify-center px-3">
     <nav id="notch" aria-label="Main" class="relative flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-3 md:px-8 md:py-4">
+      <button id="mobile-island-toggle" type="button" class="hidden items-center gap-2 rounded-full px-2 py-1.5 text-sm font-semibold text-white/90" aria-expanded="false" aria-controls="mobile-island-menu" aria-label="Open navigation">
+        <span id="mobile-island-avatar" class="grid h-6 w-6 place-items-center overflow-hidden rounded-full bg-white/10 text-xs font-bold"></span>
+        <span>BRZYX</span>
+        <svg class="h-3.5 w-3.5 text-white/55 transition-transform" id="mobile-island-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
       <a href="#/" data-route="home" class="flex items-center gap-2.5 rounded-full" aria-label="brzy, home">
         <span id="notch-avatar" class="grid h-8 w-8 place-items-center overflow-hidden rounded-full bg-white/10 text-sm font-bold"></span>
         <span class="text-sm font-bold" id="notch-name">brzy</span>

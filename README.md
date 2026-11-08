@@ -17,7 +17,7 @@ Portfolio with a notch navbar, a ColorBends WebGL background, separate click-thr
    | `SESSION_SECRET` | a long random string |
 
 4. Discord developer portal, OAuth2 -> Redirects: add `https://brzyx.vercel.app/auth/discord`. The only scope used is `identify`.
-5. Redeploy.
+5. Redeploy, then open `https://brzyx.vercel.app/api/content`. You should see JSON. If you see a 404, the server isn't running (check that the project has no custom Output Directory or Framework override that conflicts with `vercel.json`).
 
 ## Run locally
 

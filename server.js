@@ -380,27 +380,27 @@ function publicProfileHtml(profile) {
 document.querySelectorAll('[data-spotlight]').forEach(card=>{
   const light=card.querySelector('.spotlight-light'),edge=card.querySelector('.spotlight-edge'),grain=card.querySelector('.spotlight-grain');
   const reduce=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches??false;
-  let targetX=0,targetY=0,x=0,y=0,presence=0,frame=0,pressed=false,last=0;
+  let targetX=0,targetY=0,x=0,y=0,presence=0,frame=0,pressed=false,active=false,last=0;
   const tick=now=>{
     frame=0;const dt=Math.min(.05,Math.max(.001,(now-last)/1000));last=now;
     const ease=reduce?1:1-Math.exp(-dt/.09);
     x+=(targetX-x)*ease;y+=(targetY-y)*ease;
-    const target=1;
-    presence+=(target-presence)*(reduce?1:1-Math.exp(-dt/.1));
+    const target=active?1:0;
+    presence+=(target-presence)*(reduce?1:1-Math.exp(-dt/(target>presence?.1:.32)));
     card.style.setProperty('--spot-x',x+'px');card.style.setProperty('--spot-y',y+'px');
     light.style.opacity=String(Math.min(1,presence*.15*(pressed?1.7:1)));
     edge.style.opacity=String(Math.min(1,presence*.6*(pressed?1.7:1)));
     grain.style.opacity=String(presence*0);
-    if(Math.abs(targetX-x)>.1||Math.abs(targetY-y)>.1||presence<.995)frame=requestAnimationFrame(tick);
+    if(Math.abs(targetX-x)>.1||Math.abs(targetY-y)>.1||Math.abs(target-presence)>.002)frame=requestAnimationFrame(tick);
   };
   const wake=()=>{if(!frame){last=performance.now();frame=requestAnimationFrame(tick)}};
-  const move=e=>{const r=card.getBoundingClientRect();targetX=e.clientX-r.left;targetY=e.clientY-r.top;wake()};
-  const leave=()=>{pressed=false;presence=0;light.style.opacity='0';edge.style.opacity='0';grain.style.opacity='0'};
+  const move=e=>{const r=card.getBoundingClientRect();targetX=e.clientX-r.left;targetY=e.clientY-r.top;active=true;wake()};
+  const leave=()=>{pressed=false;active=false;wake()};
   card.addEventListener('pointermove',move);
   card.addEventListener('pointerleave',leave);
   card.addEventListener('pointerdown',()=>{pressed=true;wake()});
   card.addEventListener('pointerup',()=>{pressed=false;wake()});
-  card.addEventListener('focus',()=>{const r=card.getBoundingClientRect();targetX=r.width/2;targetY=r.height/2;wake()});
+  card.addEventListener('focus',()=>{const r=card.getBoundingClientRect();targetX=r.width/2;targetY=r.height/2;active=true;wake()});
   card.addEventListener('blur',leave);
 });
 document.querySelectorAll('[data-tab]').forEach(tab=>tab.addEventListener('click',()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===tab));document.querySelectorAll('.content').forEach(x=>x.hidden=x.id!==tab.dataset.tab)}));

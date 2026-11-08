@@ -96,16 +96,19 @@ async function saveDb(db) {
 
 // Use a configured canonical origin in production; never build OAuth URLs from
 // attacker-controlled Host / X-Forwarded-* headers.
-const SITE_ORIGIN = (process.env.SITE_ORIGIN || (ON_VERCEL ? 'https://brzyx.vercel.app' : '')).replace(/\\/$/, '');
-function origin(req) {
+const SITE_ORIGIN = process.env.SITE_ORIGIN
+  ? new URL(process.env.SITE_ORIGIN).origin
+  : (ON_VERCEL ? 'https://brzyx.vercel.app' : '');
+function origin(req = { headers: {} }) {
   if (SITE_ORIGIN) return SITE_ORIGIN;
-  const host = String(req.headers.host || 'localhost').toLowerCase();
-  if (!/^(localhost|127\\.0\\.0\\.1)(:\\d{1,5})?$/.test(host)) return 'http://localhost:' + PORT;
-  return `http://${host}`;
+  const host = String(req?.headers?.host || 'localhost').toLowerCase();
+  const localHost = host === 'localhost' || host === '127.0.0.1'
+    || host.startsWith('localhost:') || host.startsWith('127.0.0.1:');
+  return localHost ? `http://${host}` : 'http://localhost:' + PORT;
 }
 const isSecure = () => SITE_ORIGIN.startsWith('https://');
-const redirectUri = () => REDIRECT_OVERRIDE || `${origin({})}/auth/discord`;
-const spotifyRedirectUri = () => SPOTIFY_REDIRECT_OVERRIDE || `${origin({})}/auth/spotify`;
+const redirectUri = () => REDIRECT_OVERRIDE || `${origin()}/auth/discord`;
+const spotifyRedirectUri = () => SPOTIFY_REDIRECT_OVERRIDE || `${origin()}/auth/spotify`;
 
 function requireSameOrigin(req, res, next) {
   const requestOrigin = req.get('origin');

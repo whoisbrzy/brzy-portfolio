@@ -1053,7 +1053,7 @@
       icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18M3 12h18"/>' },
     { id: 'icons', name: 'Icons', blurb: 'Search open icon sets, then copy the SVG or download an SVG or PNG.', mount: icons,
       icon: '<path d="m12 3 2.700 5.600 6.100.9-4.400 4.300 1 6.100L12 17l-5.400 2.900 1-6.100L3.200 9.500l6.100-.9z"/>' },
-    { id: 'roblox', name: 'Roblox Clothing Showcaser', blurb: 'Create a clean, flat 2D front-facing clothing showcase — no 3D model.', mount: clothingShowcaser,
+    { id: 'roblox', name: 'Roblox Clothing Showcaser', blurb: 'Display Roblox clothing as a flat, unfolded UV layout with front and back panels.', mount: clothingShowcaser,
       icon: '<path d="M8 3 3 6l2 4 2-1v11h10V9l2 1 2-4-5-3a4 4 0 0 1-8 0z"/>' },
   ];
 

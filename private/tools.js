@@ -933,17 +933,28 @@
   }
 
   function clothingShowcaser(body, c) {
-    const state = { shirt: null, pants: null, skin: '#e9b98a', bg: 'midnight', title: 'My clothing' };
+    const state = { shirt: null, pants: null, skin: '#e9b98a', bg: 'midnight', title: 'My clothing', mode: '3d', angle: 25 };
     let favicon = null;
     loadFavicon().then((f) => { favicon = f; draw(); });
 
     const root = el('div', 'flex flex-col gap-5');
     body.append(root);
-    const controls = el('div', 'grid gap-4 sm:grid-cols-2 lg:grid-cols-4');
+
+    const intro = el('div', 'flex flex-col gap-1');
+    const eyebrow = el('div', 'text-[10px] font-bold uppercase tracking-[.28em] text-violet-300');
+    eyebrow.textContent = 'DRIPZELS STYLE PREVIEW';
+    const heading = el('div', 'text-lg font-semibold tracking-tight text-white');
+    heading.textContent = 'Clothing studio';
+    const sub = el('p', 'text-sm text-white/50');
+    sub.textContent = 'Build your look, then switch between a 3D avatar and a flat 2D showcase.';
+    intro.append(eyebrow, heading, sub);
+    root.append(intro);
+
+    const controls = el('div', 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3');
     root.append(controls);
 
     function pick(label, key) {
-      const i = el('input', 'text-xs text-white/60 file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-black');
+      const i = el('input', 'text-xs text-white/60 file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-3 file:py-1.5 file:font-semibold file:text-black');
       i.type = 'file'; i.accept = 'image/png,image/jpeg,image/webp';
       i.addEventListener('change', async () => {
         if (!i.files[0]) return;
@@ -954,7 +965,7 @@
           }
           state[key] = img;
           draw();
-          c.say(label + ' added to the flat showcase.');
+          c.say(label + ' added to both previews.');
         } catch (e) { c.say(e.message, true); }
       });
       return field(label, i);
@@ -972,12 +983,30 @@
     controls.append(pick('Shirt template', 'shirt'), pick('Pants template (optional)', 'pants'),
       field('Showcase title', title), field('Skin color', skin), field('Background', bgSel));
 
-    const canvas = el('canvas', 'w-full rounded-3xl border border-white/10');
+    const modeRow = el('div', 'flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[.035] p-3');
+    const modeLabel = el('div', 'text-xs font-semibold uppercase tracking-wider text-white/60');
+    modeLabel.textContent = 'Preview mode';
+    const modeSelect = el('select', INPUT + ' min-w-32');
+    [['3d', '3D Avatar'], ['2d', 'Flat 2D']].forEach(([v, t]) => {
+      const o = el('option', '', t); o.value = v; modeSelect.append(o);
+    });
+    modeSelect.value = state.mode;
+    modeSelect.addEventListener('change', () => { state.mode = modeSelect.value; draw(); });
+    const rotateWrap = el('label', 'flex items-center gap-3 text-xs text-white/60');
+    const rotateText = el('span', 'whitespace-nowrap'); rotateText.textContent = 'Rotate avatar';
+    const rotate = el('input', 'w-32 accent-violet-400');
+    rotate.type = 'range'; rotate.min = '-180'; rotate.max = '180'; rotate.value = String(state.angle);
+    rotate.addEventListener('input', () => { state.angle = Number(rotate.value); draw(); });
+    rotateWrap.append(rotateText, rotate);
+    modeRow.append(modeLabel, modeSelect, rotateWrap);
+    root.append(modeRow);
+
+    const canvas = el('canvas', 'w-full rounded-3xl border border-white/10 shadow-2xl shadow-black/20');
     canvas.width = 1800; canvas.height = 850;
-    canvas.setAttribute('aria-label', 'Flat 2D Roblox clothing showcase with front, side and back views.');
+    canvas.setAttribute('aria-label', 'Roblox clothing preview with switchable 3D avatar and flat 2D views.');
     root.append(canvas);
 
-    function drawBackground(g, W, H) {
+    function drawFlatBackground(g, W, H) {
       if (state.bg === 'studio') {
         const gr = g.createLinearGradient(0, 0, 0, H);
         gr.addColorStop(0, '#f1f1f4'); gr.addColorStop(1, '#b9b9c4');
@@ -991,19 +1020,19 @@
         });
       } else {
         const gr = g.createLinearGradient(0, 0, W, H);
-        gr.addColorStop(0, '#0a0a10'); gr.addColorStop(1, '#1c1236');
+        gr.addColorStop(0, '#09090f'); gr.addColorStop(1, '#20113a');
         g.fillStyle = gr; g.fillRect(0, 0, W, H);
+        const glow = g.createRadialGradient(W*.5,H*.4,0,W*.5,H*.4,W*.65);
+        glow.addColorStop(0,'rgba(139,92,246,.18)'); glow.addColorStop(1,'rgba(139,92,246,0)');
+        g.fillStyle = glow; g.fillRect(0,0,W,H);
       }
     }
 
     function drawFlatFigure(g, cx, top, view) {
-      const front = view === 'FRONT', back = view === 'BACK';
-      const side = view === 'SIDE';
-      const s = 1;
-      const skin = state.skin;
-      const shirt = state.shirt, pants = state.pants;
+      const front = view === 'FRONT', back = view === 'BACK', side = view === 'SIDE';
+      const shirt = state.shirt, pants = state.pants, skinColor = state.skin;
       const sideKey = front ? 'front' : back ? 'back' : 'left';
-      const limbKey = front ? 'front' : back ? 'back' : 'left';
+      const limbKey = sideKey;
       const drawPart = (img, uvSet, face, x, y, w, h, fallback) => {
         g.fillStyle = fallback; g.fillRect(x, y, w, h);
         if (!img) return;
@@ -1021,57 +1050,60 @@
       const rightArmX = side ? cx + torsoW/2 : torsoX + torsoW + 10;
       const gap = side ? 0 : 8;
 
-      g.fillStyle = skin; g.fillRect(headX, headY, headW, headH);
+      g.fillStyle = skinColor; g.fillRect(headX, headY, headW, headH);
       if (front && !side) {
         g.fillStyle = '#171717';
         g.beginPath(); g.arc(cx-24, headY+47, 7, 0, Math.PI*2); g.arc(cx+24, headY+47, 7, 0, Math.PI*2); g.fill();
         g.strokeStyle = '#171717'; g.lineWidth = 5; g.beginPath(); g.arc(cx, headY+62, 22, .2*Math.PI, .8*Math.PI); g.stroke();
       }
-      drawPart(shirt, 'torso', sideKey, torsoX, torsoY, torsoW, torsoH, skin);
-      if (pants && front) {
-        const r = UV.torso.front;
+      drawPart(shirt, 'torso', sideKey, torsoX, torsoY, torsoW, torsoH, skinColor);
+      if (pants) {
+        const r = UV.torso[sideKey];
         g.save(); g.beginPath(); g.rect(torsoX, torsoY + torsoH*.58, torsoW, torsoH*.42); g.clip();
         g.drawImage(pants, r[0], r[1], r[2], r[3], torsoX, torsoY, torsoW, torsoH);
         g.restore();
       }
-      if (pants && back) {
-        const r = UV.torso.back;
-        g.save(); g.beginPath(); g.rect(torsoX, torsoY + torsoH*.58, torsoW, torsoH*.42); g.clip();
-        g.drawImage(pants, r[0], r[1], r[2], r[3], torsoX, torsoY, torsoW, torsoH);
-        g.restore();
-      }
-      if (side && pants) {
-        const r = UV.torso.left;
-        g.save(); g.beginPath(); g.rect(torsoX, torsoY + torsoH*.58, torsoW, torsoH*.42); g.clip();
-        g.drawImage(pants, r[0], r[1], r[2], r[3], torsoX, torsoY, torsoW, torsoH);
-        g.restore();
-      }
-      drawPart(shirt, 'rlimb', limbKey, leftArmX, torsoY, armW, armH, skin);
-      drawPart(shirt, 'llimb', limbKey, rightArmX, torsoY, armW, armH, skin);
+      drawPart(shirt, 'rlimb', limbKey, leftArmX, torsoY, armW, armH, skinColor);
+      drawPart(shirt, 'llimb', limbKey, rightArmX, torsoY, armW, armH, skinColor);
       const leftLegX = side ? cx-legW : cx-legW-gap/2;
       const rightLegX = side ? cx : cx+gap/2;
-      drawPart(pants, 'rlimb', limbKey, leftLegX, legY, legW, legH, skin);
-      if (!side) drawPart(pants, 'llimb', limbKey, rightLegX, legY, legW, legH, skin);
-      else drawPart(pants, 'llimb', limbKey, rightLegX, legY, legW, legH, skin);
-      g.strokeStyle = 'rgba(255,255,255,.12)'; g.lineWidth = 2;
-      g.strokeRect(headX, headY, headW, headH);
-      g.strokeRect(torsoX, torsoY, torsoW, torsoH);
+      drawPart(pants, 'rlimb', limbKey, leftLegX, legY, legW, legH, skinColor);
+      drawPart(pants, 'llimb', limbKey, rightLegX, legY, legW, legH, skinColor);
+      g.strokeStyle = 'rgba(255,255,255,.14)'; g.lineWidth = 2;
+      g.strokeRect(headX, headY, headW, headH); g.strokeRect(torsoX, torsoY, torsoW, torsoH);
     }
 
-    function draw() {
-      const g = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
-      drawBackground(g, W, H);
+    function makeTexture(source, fallback) {
+      const texCanvas = el('canvas');
+      texCanvas.width = TEMPLATE_W; texCanvas.height = TEMPLATE_H;
+      const ctx = texCanvas.getContext('2d');
+      ctx.fillStyle = fallback; ctx.fillRect(0, 0, TEMPLATE_W, TEMPLATE_H);
+      if (source) ctx.drawImage(source, 0, 0, TEMPLATE_W, TEMPLATE_H);
+      return texCanvas;
+    }
+
+    function makeFace() {
+      const face = el('canvas'); face.width = 128; face.height = 128;
+      const g = face.getContext('2d');
+      g.fillStyle = state.skin; g.fillRect(0, 0, 128, 128);
+      g.fillStyle = '#20202a';
+      g.beginPath(); g.arc(42, 54, 6, 0, Math.PI*2); g.arc(86, 54, 6, 0, Math.PI*2); g.fill();
+      g.strokeStyle = '#20202a'; g.lineWidth = 5;
+      g.beginPath(); g.arc(64, 66, 23, .18*Math.PI, .82*Math.PI); g.stroke();
+      return face;
+    }
+
+    function drawFlat(g, W, H) {
+      drawFlatBackground(g, W, H);
       const dark = state.bg !== 'studio';
       g.fillStyle = dark ? '#fff' : '#111';
       g.font = '700 46px sans-serif'; g.textAlign = 'left'; g.textBaseline = 'top';
       if (state.title.trim()) g.fillText(state.title.trim(), 54, 42);
-      const centers = [W*.19, W*.5, W*.81];
-      const labels = ['FRONT', 'SIDE', 'BACK'];
+      const centers = [W*.19, W*.5, W*.81], labels = ['FRONT', 'SIDE', 'BACK'];
       labels.forEach((label, i) => {
         const x = centers[i];
         g.fillStyle = dark ? 'rgba(255,255,255,.55)' : 'rgba(0,0,0,.5)';
-        g.font = '600 25px sans-serif'; g.textAlign = 'center';
-        g.fillText(label, x, 140);
+        g.font = '600 25px sans-serif'; g.textAlign = 'center'; g.fillText(label, x, 140);
         g.fillStyle = dark ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.04)';
         g.beginPath(); g.roundRect(x-260, 180, 520, 610, 30); g.fill();
         drawFlatFigure(g, x, 220, label);
@@ -1079,11 +1111,41 @@
       drawWatermark(g, W, H, favicon, .75, !dark);
     }
 
+    function draw3D(g, W, H) {
+      const shirtTexture = makeTexture(state.shirt, state.skin);
+      const pantsTexture = makeTexture(state.pants, state.skin);
+      const skinTexture = makeTexture(null, state.skin);
+      const tex = {
+        torso: shirtTexture, arms: shirtTexture, legs: pantsTexture,
+        head: skinTexture, face: makeFace(), skinTile: skinTexture
+      };
+      renderScene(g, W, H, {
+        bg: state.bg,
+        tex,
+        figures: [{ angle: state.angle, cx: W/2, cy: 405, scale: 105 }]
+      });
+      const dark = state.bg !== 'studio';
+      g.fillStyle = dark ? '#fff' : '#111';
+      g.font = '700 46px sans-serif'; g.textAlign = 'left'; g.textBaseline = 'top';
+      if (state.title.trim()) g.fillText(state.title.trim(), 54, 42);
+      g.fillStyle = dark ? 'rgba(255,255,255,.6)' : 'rgba(0,0,0,.55)';
+      g.font = '600 22px sans-serif'; g.textAlign = 'center';
+      g.fillText('3D AVATAR  ·  DRAG THE ROTATION SLIDER', W/2, H-54);
+      drawWatermark(g, W, H, favicon, .75, !dark);
+    }
+
+    function draw() {
+      const g = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
+      if (state.mode === '3d') draw3D(g, W, H);
+      else drawFlat(g, W, H);
+      rotateWrap.style.display = state.mode === '3d' ? 'flex' : 'none';
+    }
+
     const actions = el('div', 'flex flex-wrap gap-3');
-    const save = button('Download flat showcase', BTN, async () => {
+    const save = button('Download showcase', BTN, async () => {
       draw();
-      download(await canvasBlob(canvas), 'roblox-flat-clothing-showcase.png');
-      c.say('Downloaded the flat 2D showcase.');
+      download(await canvasBlob(canvas), state.mode === '3d' ? 'roblox-3d-clothing-showcase.png' : 'roblox-flat-2d-clothing-showcase.png');
+      c.say('Downloaded the ' + state.mode.toUpperCase() + ' clothing showcase.');
     });
     const reset = button('Reset clothing', BTN2, () => {
       state.shirt = null; state.pants = null; draw(); c.say('Clothing cleared.');
@@ -1091,9 +1153,8 @@
     actions.append(save, reset);
     root.append(actions);
     draw();
-    c.say('Upload a classic Roblox shirt or pants template to see a flat front, side and back showcase.');
+    c.say('Upload classic Roblox shirt and pants templates, then switch between the 3D avatar and flat 2D views.');
   }
-
   // ============================================================
   // Registry + grid
   // ============================================================

@@ -933,8 +933,8 @@
   }
 
   function clothingShowcaser(body, c) {
-    const state = { shirt: null, pants: null, skin: '#e9b98a', bg: 'midnight', title: 'My clothing' };
-    let favicon = null, tex = null;
+    const state = { shirt: null, pants: null, skin: '#e9b98a', title: 'My clothing' };
+    let favicon = null;
     loadFavicon().then((f) => { favicon = f; draw(); });
 
     const root = el('div', 'grid gap-5 lg:grid-cols-[18rem_1fr]');
@@ -945,48 +945,67 @@
       i.type = 'file'; i.accept = 'image/png,image/*';
       i.addEventListener('change', async () => {
         if (!i.files[0]) return;
-        try { state[key] = await loadImageFile(i.files[0]); rebuild(); draw(); c.say(`${label} applied.`); } catch (e) { c.say(e.message, true); }
+        try {
+          state[key] = await loadImageFile(i.files[0]);
+          draw();
+          c.say(label + ' applied to the flat template.');
+        } catch (e) { c.say(e.message, true); }
       });
       return field(label, i);
     };
     const title = el('input', INPUT); title.value = state.title; title.maxLength = 40;
     title.addEventListener('input', () => { state.title = title.value; draw(); });
     const skin = el('input'); skin.type = 'color'; skin.value = state.skin;
-    skin.addEventListener('input', () => { state.skin = skin.value; rebuild(); draw(); });
-    const bgSel = el('select', INPUT);
-    [['midnight', 'Midnight'], ['aurora', 'Aurora'], ['studio', 'Studio light']].forEach(([v, t]) => { const o = el('option', '', t); o.value = v; bgSel.append(o); });
-    bgSel.addEventListener('change', () => { state.bg = bgSel.value; draw(); });
-    const dlOne = button('Download flat showcase', BTN, () => exportOne());
-    const dlSheet = button('Download front + back', BTN2, () => exportSheet());
-    const hint = el('p', 'text-xs leading-relaxed text-white/45', 'Upload classic 585 × 559 Roblox shirt and pants templates. The clothing is shown as a clean, flat 2D front view — no 3D model, rotation or perspective. Exports include the site favicon.');
-    side.append(pick('Shirt template', 'shirt'), pick('Pants template (optional)', 'pants'), field('Name on showcase', title), field('Skin color', skin), field('Background', bgSel), dlOne, dlSheet, hint);
+    skin.addEventListener('input', () => { state.skin = skin.value; draw(); });
+    const dlOne = button('Download flat template', BTN, () => exportOne());
+    const hint = el('p', 'text-xs leading-relaxed text-white/45',
+      'Upload a classic 585 × 559 Roblox shirt or pants template. It is displayed as a flat, unfolded 2D clothing layout — front and back panels in the middle, arms on the sides. No avatar, 3D model or rotation.');
+    side.append(pick('Shirt template', 'shirt'), pick('Pants template (optional)', 'pants'),
+      field('Name on showcase', title), field('Skin color', skin), dlOne, hint);
 
     const view = el('div', 'flex min-w-0 flex-col items-center gap-3');
-    const canvas = el('canvas', 'max-h-[70vh] max-w-full rounded-2xl border border-white/10');
-    canvas.width = 900; canvas.height = 1000;
-    canvas.setAttribute('aria-label', 'Flat 2D front view of Roblox clothing.');
+    const canvas = el('canvas', 'max-w-full rounded-2xl border border-white/10');
+    canvas.width = 1500; canvas.height = 620;
+    canvas.style.width = '100%';
+    canvas.setAttribute('aria-label', 'Flat unfolded Roblox clothing template with front and back panels.');
     view.append(canvas);
     root.append(side, view);
 
-    function rebuild() {
-      const skinTile = el('canvas'); skinTile.width = skinTile.height = 16;
-      const sx = skinTile.getContext('2d'); sx.fillStyle = state.skin; sx.fillRect(0, 0, 16, 16);
-      tex = {
-        torso: compose([state.pants, state.shirt]),
-        arms: compose([state.shirt]),
-        legs: compose([state.pants]),
-        face: makeFace(), skinTile,
-      };
+    function background(g, W, H) {
+      g.fillStyle = '#050505';
+      g.fillRect(0, 0, W, H);
     }
-    function makeFace() {
-      const f = el('canvas'); f.width = f.height = 128;
-      const x = f.getContext('2d');
-      x.fillStyle = state.skin; x.fillRect(0, 0, 128, 128);
-      x.fillStyle = '#1a1a1a';
-      x.beginPath(); x.ellipse(44, 54, 7, 11, 0, 0, Math.PI * 2); x.ellipse(84, 54, 7, 11, 0, 0, Math.PI * 2); x.fill();
-      x.strokeStyle = '#1a1a1a'; x.lineWidth = 6; x.lineCap = 'round';
-      x.beginPath(); x.arc(64, 74, 26, 0.25 * Math.PI, 0.75 * Math.PI); x.stroke();
-      return f;
+    function panel(g, img, uv, face, x, y, w, h) {
+      g.fillStyle = state.skin;
+      g.fillRect(x, y, w, h);
+      if (img) {
+        const r = UV[uv][face];
+        const sx = img.width / TEMPLATE_W, sy = img.height / TEMPLATE_H;
+        g.drawImage(img, r[0] * sx, r[1] * sy, r[2] * sx, r[3] * sy, x, y, w, h);
+      }
+      g.strokeStyle = '#f4f4f4';
+      g.lineWidth = 5;
+      g.strokeRect(x, y, w, h);
+    }
+    function drawLayout(g, W, H) {
+      background(g, W, H);
+      g.save(); g.scale(W / 1500, H / 620);
+      const shirtTex = state.shirt ? compose([state.shirt]) : null;
+      const pantsTex = state.pants ? compose([state.pants]) : null;
+
+      panel(g, shirtTex, 'rlimb', 'front', 48, 48, 136, 520);
+      panel(g, shirtTex, 'llimb', 'front', 1316, 48, 136, 520);
+      panel(g, shirtTex, 'torso', 'front', 206, 48, 518, 262);
+      panel(g, shirtTex, 'torso', 'back', 776, 48, 518, 262);
+      panel(g, pantsTex || shirtTex, 'torso', 'bottom', 336, 310, 260, 254);
+      panel(g, pantsTex || shirtTex, 'torso', 'top', 906, 310, 260, 254);
+
+      if (favicon) {
+        g.save(); g.globalAlpha = 0.95;
+        g.drawImage(favicon, 708, 326, 84, 84);
+        g.restore();
+      }
+      g.restore();
     }
     function compose(parts) {
       const t = el('canvas'); t.width = TEMPLATE_W * 2; t.height = TEMPLATE_H * 2;
@@ -995,73 +1014,29 @@
       parts.forEach((im) => im && x.drawImage(im, 0, 0, t.width, t.height));
       return t;
     }
-    function drawFlat(g, W, H) {
-      drawBackground(g, W, H, state.bg);
-      const unit = Math.min(W * 0.19, H * 0.19);
-      const cx = W / 2, top = H * 0.22;
-      const head = unit * 0.9, torsoW = unit * 2, torsoH = unit * 2;
-      const armW = unit * 0.78, armH = torsoH, legW = unit * 0.98, legH = unit * 1.85;
-      const torsoX = cx - torsoW / 2, torsoY = top + head + unit * 0.12;
-      const armY = torsoY, leftArmX = torsoX - armW - unit * 0.08, rightArmX = torsoX + torsoW + unit * 0.08;
-      const legY = torsoY + torsoH + unit * 0.06, leftLegX = cx - legW - unit * 0.02, rightLegX = cx + unit * 0.02;
-      g.fillStyle = state.skin;
-      g.fillRect(cx - head / 2, top, head, head);
-      g.drawImage(tex.face, cx - head / 2, top, head, head);
-      const drawPart = (img, uv, key, x, y, w, h) => {
-        const r = UV[uv][key], sx = img.width / TEMPLATE_W, sy = img.height / TEMPLATE_H;
-        g.drawImage(img, r[0] * sx, r[1] * sy, r[2] * sx, r[3] * sy, x, y, w, h);
-      };
-      drawPart(tex.arms, 'rlimb', 'front', leftArmX, armY, armW, armH);
-      drawPart(tex.arms, 'llimb', 'front', rightArmX, armY, armW, armH);
-      drawPart(tex.torso, 'torso', 'front', torsoX, torsoY, torsoW, torsoH);
-      drawPart(tex.legs, 'rlimb', 'front', leftLegX, legY, legW, legH);
-      drawPart(tex.legs, 'llimb', 'front', rightLegX, legY, legW, legH);
-      g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 2;
-      g.strokeRect(cx - head / 2, top, head, head);
-      g.strokeRect(torsoX, torsoY, torsoW, torsoH);
-      g.strokeRect(leftArmX, armY, armW, armH); g.strokeRect(rightArmX, armY, armW, armH);
-      g.strokeRect(leftLegX, legY, legW, legH); g.strokeRect(rightLegX, legY, legW, legH);
-    }
-    function drawTitle(g, W, scale) {
-      if (!state.title.trim()) return;
-      g.fillStyle = state.bg === 'studio' ? '#111' : '#fff';
-      g.font = `700 ${Math.round(46 * scale)}px "SF Pro", -apple-system, sans-serif`;
-      g.textAlign = 'left'; g.textBaseline = 'top';
-      g.fillText(state.title.trim(), 48 * scale, 38 * scale);
-    }
     function draw() {
       const g = canvas.getContext('2d');
-      drawFlat(g, canvas.width, canvas.height);
-      drawTitle(g, canvas.width, 1);
-      drawWatermark(g, canvas.width, canvas.height, favicon, 0.8, state.bg === 'studio');
+      drawLayout(g, canvas.width, canvas.height);
+      if (state.title.trim()) {
+        g.fillStyle = '#fff';
+        g.font = '600 22px "SF Pro", -apple-system, sans-serif';
+        g.textAlign = 'left'; g.textBaseline = 'top';
+        g.fillText(state.title.trim(), 28, 14);
+      }
     }
     async function exportOne() {
-      const W = 1800, H = 2000, cv = el('canvas'); cv.width = W; cv.height = H;
+      const cv = el('canvas'); cv.width = 3000; cv.height = 1240;
+      drawLayout(cv.getContext('2d'), cv.width, cv.height);
       const g = cv.getContext('2d');
-      drawFlat(g, W, H); drawTitle(g, W, 2);
-      drawWatermark(g, W, H, favicon, 1.8, state.bg === 'studio');
-      download(await canvasBlob(cv), 'flat-clothing-showcase.png');
-      c.say('Downloaded the flat 2D showcase.');
+      if (state.title.trim()) {
+        g.fillStyle = '#fff'; g.font = '600 44px "SF Pro", -apple-system, sans-serif';
+        g.textAlign = 'left'; g.textBaseline = 'top'; g.fillText(state.title.trim(), 56, 28);
+      }
+      download(await canvasBlob(cv), 'flat-roblox-clothing-template.png');
+      c.say('Downloaded the flat unfolded clothing template.');
     }
-    async function exportSheet() {
-      const W = 2000, H = 1400, cv = el('canvas'); cv.width = W; cv.height = H;
-      const g = cv.getContext('2d');
-      drawBackground(g, W, H, state.bg);
-      drawTitle(g, W, 1.4);
-      const half = el('canvas'); half.width = 900; half.height = 1000;
-      drawFlat(half.getContext('2d'), half.width, half.height);
-      g.drawImage(half, 40, 180, 900, 1000);
-      g.save(); g.translate(W, 0); g.scale(-1, 1); g.drawImage(half, 1060, 180, 900, 1000); g.restore();
-      g.fillStyle = state.bg === 'studio' ? '#111' : '#fff';
-      g.font = '600 30px "SF Pro", -apple-system, sans-serif';
-      g.textAlign = 'center'; g.fillText('FRONT', 490, 130); g.fillText('BACK TEMPLATE', 1510, 130);
-      drawWatermark(g, W, H, favicon, 1.4, state.bg === 'studio');
-      download(await canvasBlob(cv), 'flat-clothing-showcase-sheet.png');
-      c.say('Downloaded the flat showcase sheet.');
-    }
-    rebuild();
     draw();
-    c.say('Upload a shirt template to create a flat 2D showcase.');
+    c.say('Upload a shirt or pants template to preview it in the flat unfolded layout.');
   }
 
   // ============================================================

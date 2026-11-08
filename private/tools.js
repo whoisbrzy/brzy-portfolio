@@ -794,7 +794,8 @@
       links: [
         { title: 'My Website', url: 'https://example.com' },
         { title: 'Instagram', url: 'https://instagram.com/' }
-      ]
+      ],
+      projects: []
     };
     let state = { ...defaults, links: defaults.links.map((x) => ({ ...x })) };
     try {
@@ -808,7 +809,11 @@
           links: Array.isArray(saved.links) ? saved.links.slice(0, 8).map((x) => ({
             title: String(x.title || '').slice(0, 28),
             url: String(x.url || '').slice(0, 240)
-          })) : defaults.links.map((x) => ({ ...x }))
+          })) : defaults.links.map((x) => ({ ...x })),
+          projects: Array.isArray(saved.projects) ? saved.projects.slice(0, 12).map((x) => ({
+            title: String(x.title || '').slice(0, 40),
+            url: String(x.url || '').slice(0, 240)
+          })) : []
         };
       }
     } catch {}
@@ -887,6 +892,38 @@
     }
     drawEditorLinks();
 
+    const projectsHead = el('div', 'flex items-center justify-between gap-3 mt-2');
+    const projectsTitle = el('div', 'text-sm font-semibold text-white');
+    projectsTitle.textContent = 'Past projects page';
+    const addProject = button('+ Add project', BTN2, () => {
+      if (state.projects.length >= 12) { c.say('You can add up to 12 projects.', true); return; }
+      state.projects.push({ title: '', url: '' });
+      drawEditorProjects(); drawPreview();
+    });
+    projectsHead.append(projectsTitle, addProject);
+    editor.append(projectsHead);
+    const projectsList = el('div', 'flex flex-col gap-3');
+    editor.append(projectsList);
+
+    function drawEditorProjects() {
+      projectsList.replaceChildren();
+      state.projects.forEach((project, index) => {
+        const card = el('div', 'grid gap-2 rounded-2xl border border-white/10 bg-white/[.025] p-3 sm:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)_auto]');
+        const titleInput = el('input', INPUT);
+        titleInput.placeholder = 'Project name'; titleInput.maxLength = 40; titleInput.value = project.title;
+        titleInput.addEventListener('input', () => { state.projects[index].title = titleInput.value; drawPreview(); });
+        const urlInput = el('input', INPUT);
+        urlInput.placeholder = 'https://project.com'; urlInput.maxLength = 240; urlInput.inputMode = 'url'; urlInput.value = project.url;
+        urlInput.addEventListener('input', () => { state.projects[index].url = urlInput.value; drawPreview(); });
+        const remove = button('Remove', BTN2, () => { state.projects.splice(index, 1); drawEditorProjects(); drawPreview(); });
+        remove.className += ' self-start';
+        card.append(titleInput, urlInput, remove);
+        projectsList.append(card);
+      });
+      addProject.disabled = state.projects.length >= 12;
+    }
+    drawEditorProjects();
+
     const actions = el('div', 'flex flex-wrap gap-2');
     const save = button('Save draft', BTN, () => {
       try {
@@ -895,7 +932,7 @@
       } catch { c.say('Could not save this draft in your browser.', true); }
     });
     const reset = button('Reset draft', BTN2, () => {
-      state = { ...defaults, links: defaults.links.map((x) => ({ ...x })) };
+      state = { ...defaults, links: defaults.links.map((x) => ({ ...x })), projects: [] };
       const fields = editor.querySelectorAll('input');
       if (fields[0]) fields[0].value = state.name;
       if (fields[1]) fields[1].value = state.username;
@@ -903,6 +940,7 @@
       bio.value = state.bio;
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
       drawEditorLinks();
+      drawEditorProjects();
       drawPreview();
       c.say('Draft reset to the starter profile.');
     });
@@ -924,10 +962,16 @@
     const displayName = el('div', 'mt-4 text-center text-xl font-bold tracking-tight text-white');
     const handle = el('div', 'mt-1 text-center text-xs text-white/40');
     const bioText = el('p', 'mx-auto mt-3 max-w-[290px] text-center text-sm leading-relaxed text-white/60');
-    const previewLinks = el('div', 'mt-6 flex flex-col gap-2');
+    const pageNav = el('div', 'mt-5 grid grid-cols-2 gap-2');
+    const linksTab = button('Links', '', () => { activePage = 'links'; drawPreview(); });
+    const projectsTab = button('Past projects', '', () => { activePage = 'projects'; drawPreview(); });
+    const previewLinks = el('div', 'mt-3 flex flex-col gap-2');
+    const previewProjects = el('div', 'mt-3 hidden flex-col gap-3');
     const footer = el('div', 'mt-6 text-center text-[10px] font-semibold uppercase tracking-[.2em] text-white/25');
     footer.textContent = 'MADE WITH BRZYX';
-    profile.append(avatar, displayName, handle, bioText, previewLinks, footer);
+    let activePage = 'links';
+    profile.append(avatar, displayName, handle, bioText, pageNav, previewLinks, previewProjects, footer);
+    pageNav.append(linksTab, projectsTab);
     stage.append(glow, profile);
     previewWrap.append(stage);
 
@@ -947,6 +991,16 @@
       handle.textContent = '@' + (state.username || 'yourname');
       bioText.textContent = state.bio || 'Your short bio will appear here.';
       previewLinks.replaceChildren();
+      previewProjects.replaceChildren();
+      const onLinks = activePage === 'links';
+      previewLinks.classList.toggle('hidden', !onLinks);
+      previewProjects.classList.toggle('hidden', onLinks);
+      previewProjects.classList.toggle('flex', !onLinks);
+      [linksTab, projectsTab].forEach((tab, i) => {
+        const selected = (i === 0) === onLinks;
+        tab.className = 'rounded-xl px-3 py-2 text-xs font-semibold transition ' + (selected ? 'text-black' : 'border border-white/10 bg-white/[.04] text-white/60');
+        tab.style.background = selected ? state.accent : '';
+      });
       const links = state.links.filter((x) => x.title.trim() && validHref(x.url));
       if (!links.length) {
         const empty = el('div', 'rounded-xl border border-dashed border-white/15 px-3 py-4 text-center text-xs text-white/35');
@@ -957,9 +1011,36 @@
         const a = el('a', 'flex min-h-12 items-center justify-center rounded-xl border border-white/10 bg-white/[.045] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10');
         a.href = validHref(link.url);
         a.target = '_blank'; a.rel = 'noopener noreferrer';
+        const favicon = el('img', 'absolute left-3 h-5 w-5 rounded-sm object-contain');
+        favicon.alt = '';
+        favicon.loading = 'lazy';
+        favicon.src = 'https://www.google.com/s2/favicons?domain_url=' + encodeURIComponent(a.href) + '&sz=64';
+        a.classList.add('relative');
+        a.append(favicon);
         a.textContent = link.title;
+        a.append(favicon);
         a.style.borderColor = state.accent + '55';
         previewLinks.append(a);
+      });
+      const projects = state.projects.filter((x) => x.title.trim() && validHref(x.url));
+      if (!projects.length) {
+        const empty = el('div', 'rounded-xl border border-dashed border-white/15 px-3 py-5 text-center text-xs text-white/35');
+        empty.textContent = 'Your past projects will appear here';
+        previewProjects.append(empty);
+      }
+      projects.forEach((project) => {
+        const href = validHref(project.url);
+        const card = el('a', 'relative flex items-center gap-3 rounded-xl border border-white/10 bg-white/[.045] p-3 transition hover:bg-white/10');
+        card.href = href; card.target = '_blank'; card.rel = 'noopener noreferrer';
+        const favicon = el('img', 'h-9 w-9 rounded-lg border border-white/10 bg-black/20 object-contain p-1');
+        favicon.alt = ''; favicon.loading = 'lazy';
+        favicon.src = 'https://www.google.com/s2/favicons?domain_url=' + encodeURIComponent(href) + '&sz=64';
+        const info = el('div', 'min-w-0 flex-1');
+        info.append(el('div', 'truncate text-sm font-semibold text-white', project.title));
+        info.append(el('div', 'truncate text-xs text-white/40', new URL(href).hostname));
+        card.append(favicon, info);
+        card.style.borderColor = state.accent + '55';
+        previewProjects.append(card);
       });
     }
     drawPreview();

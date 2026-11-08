@@ -40,6 +40,7 @@
       label: 'Reviews',
       fields: [
         ['name', 'Client name', 'text', true],
+        ['avatar', 'Profile picture URL (optional)', 'text'],
         ['role', 'Role / community', 'text'],
         ['rating', 'Rating (1–5)', 'text', true],
         ['quote', 'Review', 'textarea', true],
@@ -149,11 +150,12 @@
       ...items.map((item) => {
         const li = document.createElement('li');
         li.className = 'flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3';
-        if (current === 'clients') {
+        if (current === 'clients' || (current === 'reviews' && item.avatar)) {
           const img = document.createElement('img');
           img.className = 'h-10 w-10 rounded-full bg-white/10 object-cover';
           img.alt = '';
-          if (item.icon) img.src = item.icon;
+          if (current === 'clients' && item.icon) img.src = item.icon;
+          if (current === 'reviews' && item.avatar) img.src = item.avatar;
           li.append(img);
         }
         const text = document.createElement('div');

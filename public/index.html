@@ -70,6 +70,7 @@
     <div class="island-details min-w-0 flex-1">
       <p id="spotify-track" class="truncate text-xs font-semibold text-white"></p>
       <p id="spotify-artist" class="truncate text-[11px] text-white/50"></p>
+      <select id="spotify-playlist" class="mt-1 hidden max-w-full bg-transparent text-[10px] text-white/45 outline-none" aria-label="Choose Spotify playlist"><option value="">All Spotify playback</option></select>
     </div>
     <button id="spotify-island-close" type="button" class="island-details rounded-full px-2 py-1 text-xs text-white/45 hover:text-white" aria-label="Hide player">×</button>
   </div>
@@ -107,6 +108,7 @@
       </ul>
 
       <div class="flex items-center gap-2">
+<button id="spotify-connect" type="button" class="rounded-full border border-white/15 px-3 py-1.5 font-compact text-xs font-semibold text-white/75 transition-colors hover:bg-white/10">Connect Spotify</button>
         <button id="admin-btn" type="button" class="hidden rounded-full border border-white/15 px-3.5 py-1.5 font-compact text-sm font-semibold text-white hover:bg-white/10">Admin</button>
         <button id="signout-btn" type="button" class="hidden px-2 py-1.5 font-compact text-sm font-semibold text-white/60 hover:text-white">Sign out</button>
         <a id="login-btn" href="/auth/discord" class="flex items-center gap-2 rounded-full bg-white px-4 py-2 font-compact text-sm font-semibold text-black transition-transform hover:scale-[1.03]">

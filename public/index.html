@@ -101,13 +101,6 @@
     </nav>
   </header>
 
-  <div id="global-announcement" class="hidden fixed left-1/2 top-24 z-40 flex w-[min(720px,calc(100vw-32px))] -translate-x-1/2 items-center gap-4 rounded-2xl border border-white/15 bg-[#111]/95 px-5 py-3 shadow-2xl backdrop-blur-xl" role="status">
-    <p id="global-announcement-text" class="min-w-0 flex-1 text-sm text-white/85"></p>
-    <button id="global-announcement-dismiss" type="button" class="rounded-full border border-white/15 px-3 py-1 text-xs text-white/60 hover:bg-white/10" aria-label="Dismiss announcement">Dismiss</button>
-  </div>
-  <div id="maintenance-screen" class="hidden fixed inset-0 z-[90] grid place-items-center bg-[#050505] px-6 text-center">
-    <div class="max-w-lg"><p class="mb-4 text-xs font-semibold uppercase tracking-[.25em] text-white/35">BRZYX / MAINTENANCE</p><h1 class="text-4xl font-bold tracking-tight sm:text-5xl">We'll be right back.</h1><p id="maintenance-message" class="mt-5 text-sm leading-relaxed text-white/55"></p><a href="/auth/discord" class="mt-7 inline-flex rounded-full border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/75 transition-colors hover:bg-white/10">Admin sign in</a></div>
-  </div>
   <main id="views" class="relative h-full">
     <!-- Home -->
     <section data-view="home" class="view active flex items-center justify-center px-6 pt-36 pb-24 md:pt-28" aria-labelledby="home-title">
@@ -219,7 +212,7 @@
     </section>
   </div>
 
-  <div id="admin-mount" class="fixed inset-0 z-[80] hidden overflow-y-auto bg-black/75 px-3 py-4 backdrop-blur-md sm:px-6 sm:py-8" aria-modal="true" role="dialog" aria-label="Admin dashboard"></div>
+  <div id="admin-mount"></div>
 
   <script src="/colorbends.js"></script>
   <script src="/app.js"></script>

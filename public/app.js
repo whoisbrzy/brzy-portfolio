@@ -250,6 +250,100 @@
     panelLoaded = true;
   }
 
+  // ---------- Spotify Dynamic Island ----------
+  const spotifyIsland = $('spotify-island');
+  const spotifyPlaylist = $('spotify-playlist');
+  const spotifyConnect = $('spotify-connect');
+  let spotifyConnected = false;
+  let spotifyHiddenForTrack = false;
+  let lastSpotifyTrack = '';
+
+  async function loadSpotifyPlaylists() {
+    const r = await fetch('/api/spotify/playlists');
+    if (!r.ok) return;
+    const data = await r.json();
+    const saved = localStorage.getItem('brzy-spotify-playlist') || '';
+    spotifyPlaylist.replaceChildren();
+    const all = h('option', '', 'All Spotify playback');
+    all.value = '';
+    spotifyPlaylist.append(all);
+    (data.items || []).forEach((playlist) => {
+      const option = h('option', '', playlist.name);
+      option.value = playlist.uri;
+      spotifyPlaylist.append(option);
+    });
+    spotifyPlaylist.value = [...spotifyPlaylist.options].some((o) => o.value === saved) ? saved : '';
+    spotifyPlaylist.classList.remove('hidden');
+  }
+
+  async function pollSpotify() {
+    if (!spotifyConnected) return;
+    try {
+      const r = await fetch('/api/spotify/now-playing', { cache: 'no-store' });
+      if (!r.ok) return;
+      const data = await r.json();
+      const selected = spotifyPlaylist.value;
+      const matchesPlaylist = !selected || (data.contextUri && data.contextUri === selected);
+      const active = data.playing && data.track && matchesPlaylist;
+      if (!active) {
+        spotifyIsland.classList.remove('active');
+        spotifyHiddenForTrack = false;
+        lastSpotifyTrack = '';
+        return;
+      }
+      const trackKey = data.track + '|' + data.artist;
+      if (trackKey !== lastSpotifyTrack) spotifyHiddenForTrack = false;
+      lastSpotifyTrack = trackKey;
+      if (spotifyHiddenForTrack) return;
+      $('spotify-track').textContent = data.track;
+      $('spotify-artist').textContent = data.artist;
+      $('spotify-art').src = data.image || '';
+      $('spotify-art').alt = data.track + ' album artwork';
+      spotifyIsland.classList.add('active');
+      spotifyIsland.title = 'Now playing on Spotify';
+    } catch { /* Playback status is optional; keep the portfolio usable. */ }
+  }
+
+  async function initSpotify() {
+    const status = await fetch('/api/spotify/status').then((r) => r.json()).catch(() => ({ configured: false, connected: false }));
+    spotifyConnected = !!status.connected;
+    if (!status.configured) {
+      spotifyConnect.title = 'Spotify connection needs Developer App credentials';
+      spotifyConnect.textContent = 'Spotify';
+      spotifyConnect.disabled = true;
+      spotifyConnect.classList.add('opacity-50', 'cursor-not-allowed');
+      return;
+    }
+    if (spotifyConnected) {
+      spotifyConnect.textContent = 'Disconnect Spotify';
+      await loadSpotifyPlaylists();
+      await pollSpotify();
+      window.setInterval(pollSpotify, 15000);
+    } else {
+      spotifyConnect.textContent = 'Connect Spotify';
+      spotifyConnect.onclick = () => { location.href = '/auth/spotify'; };
+    }
+  }
+
+  spotifyPlaylist.addEventListener('change', () => {
+    localStorage.setItem('brzy-spotify-playlist', spotifyPlaylist.value);
+    spotifyHiddenForTrack = false;
+    pollSpotify();
+  });
+  $('spotify-island-close').addEventListener('click', () => {
+    spotifyHiddenForTrack = true;
+    spotifyIsland.classList.remove('active');
+  });
+  spotifyConnect.addEventListener('click', async () => {
+    if (!spotifyConnected) return;
+    await fetch('/api/spotify/disconnect', { method: 'POST' });
+    spotifyConnected = false;
+    spotifyPlaylist.classList.add('hidden');
+    spotifyIsland.classList.remove('active');
+    spotifyConnect.textContent = 'Connect Spotify';
+    spotifyConnect.onclick = () => { location.href = '/auth/spotify'; };
+  });
+
   async function init() {
     const [content, me] = await Promise.all([
       fetch('/api/content').then((r) => (r.ok ? r.json() : null)).catch(() => null),
@@ -257,6 +351,7 @@
     ]);
     if (content) db = content;
     renderContent();
+    initSpotify();
 
     if (me.user) {
       $('login-btn').classList.add('hidden');
@@ -289,6 +384,10 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(renderContent, 150);
   });
+  if (new URLSearchParams(location.search).get('spotify') === 'failed') {
+    history.replaceState(null, '', '/');
+    alert('Spotify connection failed. Check the Spotify app settings and try again.');
+  }
   if (new URLSearchParams(location.search).get('login') === 'failed') {
     history.replaceState(null, '', '/');
     alert('Discord login failed. Try again.');

@@ -250,6 +250,85 @@
     panelLoaded = true;
   }
 
+  // ---------- BRZYX command menu ----------
+  const commandOverlay = $('command-overlay');
+  const commandSearch = $('command-search');
+  const commandResults = $('command-results');
+  const commandItems = [
+    { label: 'Home', detail: 'Go to the homepage', route: '/', keywords: 'start landing' },
+    { label: 'Past Work', detail: 'Browse completed client work', route: '/past-work', keywords: 'portfolio clients work' },
+    { label: 'Projects', detail: 'Explore personal projects', route: '/projects', keywords: 'builds development' },
+    { label: 'Reviews', detail: 'Read client feedback', route: '/reviews', keywords: 'testimonials feedback' },
+    { label: 'Contact', detail: 'Get in touch', route: '/contact', keywords: 'message commission hire' },
+    { label: 'Privacy Policy', detail: 'View privacy information', route: '/privacy', keywords: 'legal data' },
+    { label: 'Terms of Service', detail: 'View website terms', route: '/terms', keywords: 'legal rules' },
+  ];
+  let commandMatches = [];
+  let commandIndex = 0;
+  let commandPreviousFocus = null;
+
+  function closeCommands() {
+    commandOverlay.classList.add('hidden');
+    commandOverlay.setAttribute('aria-hidden', 'true');
+    commandPreviousFocus?.focus?.({ preventScroll: true });
+  }
+
+  function chooseCommand(item) {
+    if (!item) return;
+    location.hash = item.route;
+    closeCommands();
+  }
+
+  function renderCommands() {
+    const query = commandSearch.value.trim().toLowerCase();
+    commandMatches = commandItems.filter((item) => (item.label + ' ' + item.detail + ' ' + item.keywords).toLowerCase().includes(query));
+    commandIndex = Math.min(commandIndex, Math.max(0, commandMatches.length - 1));
+    commandResults.replaceChildren();
+    if (!commandMatches.length) {
+      commandResults.append(h('p', 'px-3 py-8 text-center text-sm text-white/40', 'No matching commands.'));
+      return;
+    }
+    commandMatches.forEach((item, index) => {
+      const button = h('button', 'command-item flex w-full items-center justify-between gap-4 rounded-xl px-3 py-3 text-left text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white');
+      button.type = 'button';
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-selected', index === commandIndex ? 'true' : 'false');
+      button.append(h('span', 'font-medium', item.label), h('span', 'text-xs text-white/35', item.detail));
+      button.addEventListener('click', () => chooseCommand(item));
+      commandResults.append(button);
+    });
+  }
+
+  function openCommands() {
+    commandPreviousFocus = document.activeElement;
+    commandOverlay.classList.remove('hidden');
+    commandOverlay.setAttribute('aria-hidden', 'false');
+    commandSearch.value = '';
+    commandIndex = 0;
+    renderCommands();
+    commandSearch.focus();
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      if (commandOverlay.classList.contains('hidden')) openCommands();
+      else closeCommands();
+      return;
+    }
+    if (commandOverlay.classList.contains('hidden')) return;
+    if (event.key === 'Escape') { event.preventDefault(); closeCommands(); }
+    else if (event.key === 'ArrowDown' && commandMatches.length) {
+      event.preventDefault(); commandIndex = (commandIndex + 1) % commandMatches.length; renderCommands();
+    } else if (event.key === 'ArrowUp' && commandMatches.length) {
+      event.preventDefault(); commandIndex = (commandIndex - 1 + commandMatches.length) % commandMatches.length; renderCommands();
+    } else if (event.key === 'Enter' && commandMatches.length) {
+      event.preventDefault(); chooseCommand(commandMatches[commandIndex]);
+    }
+  });
+  commandSearch.addEventListener('input', () => { commandIndex = 0; renderCommands(); });
+  commandOverlay.addEventListener('click', (event) => { if (event.target === commandOverlay) closeCommands(); });
+
   async function init() {
     const [content, me] = await Promise.all([
       fetch('/api/content').then((r) => (r.ok ? r.json() : null)).catch(() => null),

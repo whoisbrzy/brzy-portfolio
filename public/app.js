@@ -287,6 +287,7 @@
       const active = data.playing && data.track && matchesPlaylist;
       if (!active) {
         spotifyIsland.classList.remove('active');
+        $('notch').classList.remove('spotify-playing');
         spotifyHiddenForTrack = false;
         lastSpotifyTrack = '';
         return;
@@ -300,6 +301,7 @@
       $('spotify-art').src = data.image || '';
       $('spotify-art').alt = data.track + ' album artwork';
       spotifyIsland.classList.add('active');
+      $('notch').classList.add('spotify-playing');
       spotifyIsland.title = 'Now playing on Spotify';
     } catch { /* Playback status is optional; keep the portfolio usable. */ }
   }
@@ -333,6 +335,7 @@
   $('spotify-island-close').addEventListener('click', () => {
     spotifyHiddenForTrack = true;
     spotifyIsland.classList.remove('active');
+    $('notch').classList.remove('spotify-playing');
   });
   spotifyConnect.addEventListener('click', async () => {
     if (!spotifyConnected) return;
@@ -340,6 +343,7 @@
     spotifyConnected = false;
     spotifyPlaylist.classList.add('hidden');
     spotifyIsland.classList.remove('active');
+    $('notch').classList.remove('spotify-playing');
     spotifyConnect.textContent = 'Connect Spotify';
     spotifyConnect.onclick = () => { location.href = '/auth/spotify'; };
   });

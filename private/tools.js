@@ -924,6 +924,66 @@
     }
     drawEditorProjects();
 
+    const publishPanel = el('div', 'flex flex-col gap-3 rounded-2xl border border-violet-400/20 bg-violet-400/[.045] p-4');
+    const publishHead = el('div', 'flex flex-col gap-1');
+    const publishTitle = el('div', 'text-sm font-semibold text-white');
+    publishTitle.textContent = 'Publish your page';
+    const publishDesc = el('p', 'text-xs leading-relaxed text-white/45');
+    publishDesc.textContent = 'Make your profile public at brzyx.vercel.app/p/your-username. You can update or unpublish it anytime.';
+    publishHead.append(publishTitle, publishDesc);
+    const publishActions = el('div', 'flex flex-wrap gap-2');
+    const publish = button('Publish page', BTN, async () => {
+      const username = state.username.trim().toLowerCase();
+      if (!/^[a-z0-9_]{3,24}$/.test(username)) {
+        c.say('Username must be 3–24 characters using letters, numbers or underscores.', true);
+        return;
+      }
+      publish.disabled = true;
+      c.say('Publishing your page…');
+      try {
+        const response = await fetch('/api/biolink/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(state)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Could not publish your page.');
+        showPublished(data.url);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+        c.say('Your page is live: ' + data.url);
+      } catch (error) {
+        c.say(error.message || 'Could not publish your page.', true);
+      } finally { publish.disabled = false; }
+    });
+    const unpublish = button('Unpublish', BTN2, async () => {
+      if (!confirm('Unpublish your BRZYX page? Its public URL will stop working.')) return;
+      unpublish.disabled = true;
+      try {
+        const response = await fetch('/api/biolink/publish', { method: 'DELETE' });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Could not unpublish your page.');
+        publishedInfo.replaceChildren();
+        c.say('Your page has been unpublished.');
+      } catch (error) { c.say(error.message || 'Could not unpublish your page.', true); }
+      finally { unpublish.disabled = false; }
+    });
+    const publishedInfo = el('div', 'hidden flex flex-wrap items-center gap-2');
+    function showPublished(url) {
+      publishedInfo.classList.remove('hidden');
+      publishedInfo.replaceChildren();
+      const link = el('a', 'min-w-0 break-all text-xs font-semibold text-violet-200 underline underline-offset-4', url);
+      link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+      const copyUrl = button('Copy URL', BTN2, async () => c.say((await copy(url)) ? 'Page URL copied.' : 'Could not copy URL.', false));
+      publishedInfo.append(link, copyUrl);
+    }
+    publishActions.append(publish, unpublish);
+    publishPanel.append(publishHead, publishActions, publishedInfo);
+    editor.append(publishPanel);
+
+    fetch('/api/biolink/mine').then((r) => r.ok ? r.json() : null).then((data) => {
+      if (data?.published && data.url) showPublished(data.url);
+    }).catch(() => {});
+
     const actions = el('div', 'flex flex-wrap gap-2');
     const save = button('Save draft', BTN, () => {
       try {

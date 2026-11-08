@@ -256,8 +256,9 @@ const SCHEMAS = {
   },
   reviews: (b) => {
     const rating = Math.max(1, Math.min(5, Number(b.rating) || 5));
-    if (!str(b.name) || !str(b.quote)) return null;
-    return { name: str(b.name, 80), role: str(b.role, 100), quote: str(b.quote, 600), rating };
+    const avatar = url(b.avatar);
+    if (!str(b.name) || !str(b.quote) || avatar === null) return null;
+    return { name: str(b.name, 80), avatar, role: str(b.role, 100), quote: str(b.quote, 600), rating };
   },
 };
 const BAD_FIELDS = 'Check the fields: a title is required and links must start with http(s).';

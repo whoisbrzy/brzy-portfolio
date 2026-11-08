@@ -332,10 +332,29 @@
     }
   });
 
-  document.getElementById('admin-close').onclick = () => { location.hash = '/'; };
+  const adminMount = document.getElementById('admin-mount');
+  document.getElementById('admin-close').onclick = () => {
+    adminMount.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+  };
+
+  adminMount.addEventListener('click', (event) => {
+    if (event.target === adminMount) {
+      adminMount.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !adminMount.classList.contains('hidden')) {
+      adminMount.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+    }
+  });
 
   window.openAdminPanel = () => {
-    if (location.hash !== '#/admin') location.hash = '/admin';
+    adminMount.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
     render();
   };
 })();

@@ -31,8 +31,24 @@ const PANEL_HTML = fs.readFileSync(path.join(__dirname, 'private', 'panel.html')
 const PANEL_JS = fs.readFileSync(path.join(__dirname, 'private', 'panel.js'), 'utf8');
 
 // --- storage: Upstash Redis (REST) when configured, local JSON file otherwise ---
-const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || '';
-const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || '';
+// Vercel integrations may prefix Redis variables with the database name
+// (for example BRZYX_KV_REST_API_URL). Support both prefixed and standard names.
+function findRedisEnv(suffix) {
+  const direct = process.env[suffix];
+  if (direct) return direct;
+  const match = Object.entries(process.env).find(([key, value]) =>
+    value && key.endsWith(`_${suffix}`)
+  );
+  return match?.[1] || '';
+}
+const REDIS_URL =
+  process.env.UPSTASH_REDIS_REST_URL ||
+  findRedisEnv('KV_REST_API_URL') ||
+  '';
+const REDIS_TOKEN =
+  process.env.UPSTASH_REDIS_REST_TOKEN ||
+  findRedisEnv('KV_REST_API_TOKEN') ||
+  '';
 const USE_REDIS = !!(REDIS_URL && REDIS_TOKEN);
 const DB_KEY = 'brzy:db';
 const DB_FILE = path.join(__dirname, 'data', 'db.json');

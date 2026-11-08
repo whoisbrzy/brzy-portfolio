@@ -37,8 +37,16 @@
       .veil { transition: opacity .35s ease; }
       .no-bar { scrollbar-width: none; }
       .no-bar::-webkit-scrollbar { display: none; }
+      .client-track { display: flex; width: max-content; align-items: center; gap: 4.5rem; animation: client-marquee 38s linear infinite; }
+      .client-track.reverse { animation-name: client-marquee-reverse; animation-duration: 44s; }
+      .client-logo { display: grid; width: 5.5rem; height: 4rem; flex: 0 0 auto; place-items: center; opacity: .58; filter: grayscale(1); transition: opacity .2s ease, filter .2s ease; }
+      .client-logo:hover { opacity: 1; filter: grayscale(0); }
+      .client-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+      @keyframes client-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+      @keyframes client-marquee-reverse { from { transform: translateX(-50%); } to { transform: translateX(0); } }
       @media (prefers-reduced-motion: reduce) {
         .view, .view.active, .veil { transition: none; }
+        .client-track, .client-track.reverse { animation: none; }
       }
     }
   </style>
@@ -69,6 +77,9 @@
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>
             Projects
           </a>
+        </li>
+        <li>
+          <a href="#/reviews" data-route="reviews" class="nav-link flex items-center gap-2 rounded-full px-3 py-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white">Reviews</a>
         </li>
         <li>
           <a href="#/contact" data-route="contact" class="nav-link flex items-center gap-2 rounded-full px-3 py-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white">
@@ -105,7 +116,20 @@
           <a href="#/contact" class="rounded-2xl border border-white/15 bg-black/40 px-6 py-3 font-compact text-sm font-semibold backdrop-blur transition-colors hover:bg-white/10">Contact</a>
         </div>
       </div>
-      <ul id="clients-strip" class="absolute inset-x-0 bottom-6 mx-auto hidden max-w-3xl flex-wrap items-center justify-center gap-3 px-6"></ul>
+      <section id="clients-showcase" class="absolute inset-x-0 bottom-12 mx-auto w-full max-w-6xl overflow-hidden px-0 sm:px-6" aria-label="Client communities">
+        <div class="mb-7 text-center">
+          <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Trusted by 80+ communities.</h2>
+          <p class="mt-3 text-sm text-white/50">ER:LC communities across Roblox and Discord.</p>
+        </div>
+        <div class="flex flex-col gap-7 overflow-hidden py-1">
+          <div id="clients-row-one" class="overflow-hidden"></div>
+          <div id="clients-row-two" class="overflow-hidden"></div>
+        </div>
+      </section>
+      <footer class="absolute inset-x-0 bottom-2 flex justify-center gap-5 text-xs text-white/35">
+        <a class="hover:text-white/70" href="#/privacy">Privacy Policy</a>
+        <a class="hover:text-white/70" href="#/terms">Terms of Service</a>
+      </footer>
     </section>
 
     <!-- Past Work -->
@@ -125,6 +149,46 @@
         <p class="mt-2 max-w-lg text-white/55">Things I build and ship on my own.</p>
         <div id="projects-grid" class="no-bar mt-6 grid min-h-0 flex-1 content-center gap-5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3"></div>
         <div id="projects-pager" class="flex min-h-10 items-center justify-center gap-3 pt-4"></div>
+      </div>
+    </section>
+
+ 
+    <!-- Reviews -->
+    <section data-view="reviews" class="view overflow-y-auto" aria-labelledby="reviews-title">
+      <div class="mx-auto min-h-full max-w-5xl px-6 pt-36 pb-16 md:pt-28">
+        <h2 id="reviews-title" tabindex="-1" class="text-3xl font-bold tracking-tight sm:text-4xl">Client reviews</h2>
+        <p class="mt-2 text-white/55">Feedback from people and communities I've worked with.</p>
+        <div id="reviews-grid" class="mt-8 grid gap-4 md:grid-cols-2"></div>
+      </div>
+    </section>
+
+    <!-- Privacy Policy -->
+    <section data-view="privacy" class="view overflow-y-auto" aria-labelledby="privacy-title">
+      <div class="mx-auto max-w-3xl px-6 pt-36 pb-16 md:pt-28">
+        <h2 id="privacy-title" tabindex="-1" class="text-3xl font-bold">Privacy Policy</h2>
+        <p class="mt-2 text-sm text-white/40">Last updated: November 8, 2026</p>
+        <div class="mt-8 space-y-6 text-sm leading-7 text-white/65">
+          <section><h3 class="mb-2 text-lg font-semibold text-white">Information we collect</h3><p>This portfolio may use Discord OAuth to identify signed-in users. When you sign in, Discord provides basic account information such as your user ID, username and avatar. A session cookie is used to keep you signed in.</p></section>
+          <section><h3 class="mb-2 text-lg font-semibold text-white">How information is used</h3><p>Discord sign-in is used to provide access to authorized administration features. Information entered into the portfolio's content manager, such as project details, client listings and reviews, is displayed as part of the public portfolio.</p></section>
+          <section><h3 class="mb-2 text-lg font-semibold text-white">Storage and sharing</h3><p>Portfolio content and sign-in session data may be processed by the hosting, database and authentication services needed to operate this site. We do not sell personal information. We do not intentionally collect sensitive personal information through this portfolio.</p></section>
+          <section><h3 class="mb-2 text-lg font-semibold text-white">Cookies</h3><p>A necessary session cookie may be set when you use Discord sign-in. It is used for authentication and is not an advertising cookie.</p></section>
+          <section><h3 class="mb-2 text-lg font-semibold text-white">Contact</h3><p>For questions about this policy or a request concerning information displayed on this site, use the contact options provided on the portfolio.</p></section>
+        </div>
+      </div>
+    </section>
+
+    <!-- Terms of Service -->
+    <section data-view="terms" class="view overflow-y-auto" aria-labelledby="terms-title">
+      <div class="mx-auto max-w-3xl px-6 pt-36 pb-16 md:pt-28">
+        <h2 id="terms-title" tabindex="-1" class="text-3xl font-bold">Terms of Service</h2>
+        <p class="mt-2 text-sm text-white/40">Last updated: November 8, 2026</p>
+        <div class="mt-8 space-y-6 text-sm leading-7 text-white/65">
+          <section><h3 class="mb-2 text-lg font-semibold text-white">Using this website</h3><p>You may browse this portfolio for personal and informational purposes. Do not misuse the website, attempt to disrupt its operation, or try to access administration features without permission.</p></section>
+          <section><h3 class="mb-2 text-lg font-semibold text-white">Portfolio content</h3><p>Project images, descriptions, client names and other materials are presented to showcase work. Unless stated otherwise, they remain the property of their respective owners. Do not copy or reuse materials without permission.</p></section>
+          <section><h3 class="mb-2 text-lg font-semibold text-white">Third-party services</h3><p>This website may link to or use third-party services, including Discord. Those services operate under their own terms and privacy policies. We are not responsible for third-party websites or services.</p></section>
+          <section><h3 class="mb-2 text-lg font-semibold text-white">Availability and changes</h3><p>The website and its content are provided on an as-available basis. Features, content and these terms may be updated or removed at any time.</p></section>
+          <section><h3 class="mb-2 text-lg font-semibold text-white">Contact</h3><p>If you have a question about these terms, use the contact options provided on the portfolio.</p></section>
+        </div>
       </div>
     </section>
 

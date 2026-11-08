@@ -34,9 +34,12 @@
     '/past-work': 'past-work',
     '/projects': 'projects',
     '/contact': 'contact',
+    '/reviews': 'reviews',
+    '/privacy': 'privacy',
+    '/terms': 'terms',
   };
-  const TITLES = { home: '', 'past-work': 'Past Work', projects: 'Projects', contact: 'Contact' };
-  let db = { profile: { name: 'brzy', tagline: '', avatar: '' }, pastwork: [], projects: [], contacts: [], clients: [] };
+  const TITLES = { home: '', 'past-work': 'Past Work', projects: 'Projects', contact: 'Contact', reviews: 'Reviews', privacy: 'Privacy Policy', terms: 'Terms of Service' };
+  let db = { profile: { name: 'brzy', tagline: '', avatar: '' }, pastwork: [], projects: [], contacts: [], clients: [], reviews: [] };
   let firstRoute = true;
 
   function route() {
@@ -155,33 +158,58 @@
     renderList('pastwork', 'pastwork-grid', 'pastwork-pager', 'Past work is coming soon.');
     renderList('projects', 'projects-grid', 'projects-pager', 'Projects are coming soon.');
 
-    // Clients: compact strip at the bottom of the home page
-    const strip = $('clients-strip');
-    strip.classList.toggle('hidden', !db.clients.length);
-    strip.classList.toggle('flex', !!db.clients.length);
-    strip.replaceChildren(
-      ...db.clients.slice(0, 4).map((c, idx) => {
-        const link = safeUrl(c.invite);
-        const li = h('li', idx >= 2 ? 'hidden sm:block' : '');
-        const a = h('a', 'flex items-center gap-3 rounded-full border border-white/10 bg-black/50 py-1.5 pl-1.5 pr-4 backdrop-blur transition-colors hover:bg-white/10');
-        if (link) {
-          a.href = link;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
-        }
-        const icon = h('div', 'grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-white/10 text-sm font-bold');
-        if (c.icon) {
-          const img = h('img', 'h-full w-full object-cover');
-          img.src = c.icon;
-          img.alt = '';
-          icon.append(img);
-        } else icon.textContent = (c.name || '?').charAt(0);
-        const text = h('div', 'min-w-0 text-left');
-        text.append(h('p', 'max-w-[9rem] truncate font-compact text-sm font-semibold leading-tight', c.name), h('p', 'font-compact text-xs text-white/50', Number(c.members).toLocaleString() + ' members'));
-        a.append(icon, text);
-        li.append(a);
-        return li;
-      })
+    // Client logo marquee: two rows move in opposite directions.
+    const showcase = $('clients-showcase');
+    const clients = db.clients || [];
+    showcase.classList.toggle('hidden', !clients.length);
+    const makeLogo = (client) => {
+      const link = h(client.invite ? 'a' : 'div', 'client-logo');
+      if (client.invite) {
+        link.href = safeUrl(client.invite);
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.setAttribute('aria-label', client.name);
+      }
+      if (client.icon) {
+        const img = h('img');
+        img.src = client.icon;
+        img.alt = client.name || 'Client community';
+        img.loading = 'lazy';
+        link.append(img);
+      } else {
+        link.append(h('span', 'text-center text-xs font-semibold text-white/70', client.name || 'Community'));
+      }
+      return link;
+    };
+    const fillMarqueeRow = (id, items, reverse) => {
+      const host = $(id);
+      host.replaceChildren();
+      if (!items.length) return;
+      const track = h('div', 'client-track' + (reverse ? ' reverse' : ''));
+      const group = h('div', 'flex shrink-0 items-center gap-[4.5rem]');
+      items.forEach((client) => group.append(makeLogo(client)));
+      const duplicate = group.cloneNode(true);
+      track.append(group, duplicate);
+      host.append(track);
+    };
+    const rowOne = clients.filter((_, i) => i % 2 === 0);
+    const rowTwo = clients.filter((_, i) => i % 2 === 1);
+    fillMarqueeRow('clients-row-one', rowOne.length ? rowOne : clients, false);
+    fillMarqueeRow('clients-row-two', rowTwo.length ? rowTwo : clients, true);
+
+    // Reviews are managed through the admin panel.
+    const reviewsGrid = $('reviews-grid');
+    const reviews = db.reviews || [];
+    reviewsGrid.replaceChildren(
+      ...(reviews.length ? reviews.map((review) => {
+        const article = h('article', 'rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur');
+        const stars = h('p', 'mb-4 tracking-[0.2em] text-sm text-white/80', '★'.repeat(Math.max(1, Math.min(5, Number(review.rating) || 5))) + '☆'.repeat(5 - Math.max(1, Math.min(5, Number(review.rating) || 5))));
+        const quote = h('blockquote', 'text-base leading-relaxed text-white/75', '“' + review.quote + '”');
+        const byline = h('div', 'mt-6 border-t border-white/10 pt-4');
+        byline.append(h('p', 'font-semibold text-white', review.name), h('p', 'mt-1 text-xs text-white/45', review.role || 'Client'));
+        article.append(stars, quote, byline);
+        return article;
+      }) : [empty('Client reviews will appear here soon.')])
     );
 
     $('contact-list').replaceChildren(

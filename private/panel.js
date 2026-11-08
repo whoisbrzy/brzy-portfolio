@@ -49,7 +49,6 @@
     },
   };
 
-  const overlay = document.getElementById('admin-overlay');
   const tabsEl = document.getElementById('admin-tabs');
   const formEl = document.getElementById('admin-form');
   const listEl = document.getElementById('admin-list');
@@ -252,19 +251,10 @@
     }
   });
 
-  const close = () => {
-    overlay.classList.add('hidden');
-    overlay.classList.remove('flex');
-    document.body.style.overflow = '';
-  };
-  document.getElementById('admin-close').onclick = close;
-  overlay.addEventListener('click', (e) => e.target === overlay && close());
-  document.addEventListener('keydown', (e) => e.key === 'Escape' && close());
+  document.getElementById('admin-close').onclick = () => { location.hash = '/'; };
 
   window.openAdminPanel = () => {
-    overlay.classList.remove('hidden');
-    overlay.classList.add('flex');
-    document.body.style.overflow = 'hidden';
+    if (location.hash !== '#/admin') location.hash = '/admin';
     render();
   };
 })();
